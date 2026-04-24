@@ -85,7 +85,7 @@
 | Rust | `tokio` | 通过 |
 | C++ | `fmt` | 通过 |
 | C | `redis` | 通过 |
-| JavaScript 边界样例 | `axios` | 扫描成功，但主代码默认不纳入支持语言 |
+| JavaScript | `axios` | 扫描成功；历史上的“默认不支持”结论已过期 |
 
 ### 5.2 扫描结果汇总
 
@@ -231,20 +231,26 @@
 
 以下内容属于当前产品边界，而不是这轮测试中的故障：
 
-### 8.1 JavaScript 默认不支持
+### 8.1 JavaScript 已默认支持，旧结论已过期
 
 边界样例：`axios`
 
-现象：
+现状：
 
 - 仓库可以扫描
-- 但主代码为 `.js`
-- 默认 `languages` 不包含 `javascript`
-- 所以主代码文件不会像 TS / Rust / Python / Go / C / C++ 那样进入主扫描路径
+- `.js` / `.jsx` / `.mjs` / `.cjs` 已在默认支持范围内
+- `scan.languages` 默认包含 `javascript`
+- 旧实验中的“JavaScript 默认不支持”说法已经与当前代码状态不一致
+
+当前仍需注意：
+
+- CommonJS、动态 `require`、运行时拼接路径这类模式，仍可能降低静态依赖完整性
+- JavaScript 真实仓库仍值得继续补更多回归样例
 
 结论：
 
-- `axios` 结果偏少不是漏扫 bug，而是语言支持边界。
+- 对外文档不应再把“JavaScript 默认不支持”当成当前边界。
+- JavaScript 当前更真实的边界是动态语义和生态复杂度，而不是语言开关未开启。
 
 ### 8.2 Rust 宏展开不可见
 
@@ -276,7 +282,7 @@
 
 本轮测试表明：
 
-- QuickDep 当前在 `Rust / TypeScript / Python / Go / C / C++` 六类语言上的主能力链路可用
+- QuickDep 当前在 `Rust / TypeScript / JavaScript / Python / Go / C / C++` 七类语言上的主能力链路已被实测覆盖
 - 真实仓库扫描在中大型规模下可工作
 - 文件级接口提取和依赖查询在真实项目中可返回有效结果
 - watcher、增量更新、rename 后依赖迁移和并发查询已做实测
@@ -284,7 +290,7 @@
 
 同时也确认：
 
-- JavaScript 默认不在当前支持矩阵内
+- JavaScript 已默认纳入当前支持矩阵，但复杂动态语义仍需继续补测
 - Rust 宏展开依然不可见
 - 中文全文搜索质量仍不是强项
 
@@ -295,7 +301,7 @@
 建议继续推进以下方向：
 
 1. 把本报告中的关键最小工程用例固化为自动化集成测试
-2. 明确在文档中写出 JavaScript 默认不支持，避免用户把 `axios` 这类仓库误判为故障
+2. 继续补 JavaScript 真实仓库回归，重点覆盖 CommonJS、mixed module 和动态导入模式
 3. 若要提升中文搜索体验，可评估更适合 CJK 的分词方案
 4. 若要扩大真实仓库覆盖，可继续加入：
    - 多模块 monorepo

@@ -268,10 +268,11 @@ quickdep [OPTIONS] [COMMAND]
 
 ## 文档入口
 
-- [docs/API.md](docs/API.md)
 - [docs/USAGE.md](docs/USAGE.md)
-- [docs/FEATURES.md](docs/FEATURES.md)
+- [docs/API.md](docs/API.md)
 - [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)
+- [docs/QUICKDEP_PLAIN_LANGUAGE_GUIDE.md](docs/QUICKDEP_PLAIN_LANGUAGE_GUIDE.md)
+- [docs/TEST_REPORT.md](docs/TEST_REPORT.md)
 - [web/README.md](web/README.md)
 - [CHANGELOG.md](CHANGELOG.md)
 

@@ -460,7 +460,7 @@ pretty_assertions = "1"
 
 ```bash
 # 初始化项目
-cd /Users/luozx/work/quickdep
+cd /path/to/quickdep
 
 # 创建 Cargo.toml（下一步执行）
 cargo init --name quickdep

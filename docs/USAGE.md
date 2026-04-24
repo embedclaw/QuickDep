@@ -35,7 +35,7 @@ QuickDep 会把项目数据存到项目目录下的 `.quickdep/` 中，并支持
 
 - 一个可执行的 `quickdep` CLI
 - 一个默认以 `stdio` 运行的 MCP Server
-- 一套 12 个 MCP Tools
+- 一套面向项目、符号、依赖和任务上下文的 MCP Tools
 - 一组 MCP Resources
 - 一个可选启用的本地 HTTP Server
 - 一个本地 SQLite 图数据库
@@ -52,18 +52,40 @@ QuickDep 会把项目数据存到项目目录下的 `.quickdep/` 中，并支持
 
 ## 3. 安装方式
 
-在仓库根目录执行：
+面向日常使用，推荐优先级如下：
+
+- GitHub Releases：下载对应平台的预编译二进制
+- Homebrew：
 
 ```bash
-cargo build --release
+brew install northcipher/tap/quickdep
+```
+
+- npm 二进制包装器：
+
+```bash
+npm i -g @northcipher/quickdep
+```
+
+- 源码安装 / 使用仓库最新状态：
+
+```bash
 cargo install --path .
 ```
 
-安装后可直接使用：
+如果你正在仓库根目录开发，也可以先本地编译：
+
+```bash
+cargo build --release
+```
+
+安装或编译完成后，可直接验证：
 
 ```bash
 quickdep --version
 ```
+
+分发和 Agent 集成细节见 [INTEGRATIONS.md](INTEGRATIONS.md)。
 
 ---
 
@@ -159,7 +181,7 @@ quickdep [OPTIONS] [COMMAND]
 
 ## 6. MCP Tools
 
-QuickDep 提供以下工具：
+QuickDep 当前提供以下 16 个工具：
 
 - `list_projects`
 - `scan_project`
@@ -441,7 +463,10 @@ include = ["src/**", "include/**"]
 
 ## 13. 相关文档
 
-- [README.md](/Users/luozx/work/quickdep/README.md)
-- [API.md](/Users/luozx/work/quickdep/docs/API.md)
-- [FEATURES.md](/Users/luozx/work/quickdep/docs/FEATURES.md)
-- [DEV_GUIDE.md](/Users/luozx/work/quickdep/docs/DEV_GUIDE.md)
+- [README.zh-CN.md](../README.zh-CN.md)
+- [QUICKDEP_PLAIN_LANGUAGE_GUIDE.md](QUICKDEP_PLAIN_LANGUAGE_GUIDE.md)
+- [API.md](API.md)
+- [INTEGRATIONS.md](INTEGRATIONS.md)
+- [TEST_REPORT.md](TEST_REPORT.md)
+- [web/README.md](../web/README.md)
+- [CHANGELOG.md](../CHANGELOG.md)

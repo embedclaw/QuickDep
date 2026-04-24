@@ -178,8 +178,13 @@
 | T7 | get_dependencies | 获取依赖关系图 |
 | T8 | get_call_chain | 获取调用链路径 |
 | T9 | get_file_interfaces | 获取文件内接口列表 |
-| T10 | batch_query | 批量查询 |
-| T11 | rebuild_database | 重建数据库 |
+| T10 | get_task_context | 获取场景化任务上下文 |
+| T11 | analyze_workflow_context | 强制走 workflow 场景分析 |
+| T12 | analyze_change_impact | 强制走 impact 场景分析 |
+| T13 | analyze_behavior_context | 强制走 behavior 场景分析 |
+| T14 | locate_relevant_code | 强制走 locate 场景分析 |
+| T15 | batch_query | 批量查询 |
+| T16 | rebuild_database | 重建数据库 |
 
 **依赖**：M3, M4, M8
 

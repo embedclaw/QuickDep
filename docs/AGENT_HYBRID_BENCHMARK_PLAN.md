@@ -79,8 +79,8 @@
 
 ### 3.1 仓库
 
-- QuickDep 仓库：`/Users/luozx/work/quickdep`
-- 目标仓库：`/Users/luozx/work/ark-runtime`
+- QuickDep 仓库：`/path/to/quickdep`
+- 目标仓库：`/path/to/target-repo`
 
 ### 3.2 QuickDep 前置状态
 
