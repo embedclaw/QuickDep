@@ -43,7 +43,64 @@ quickdep status /Users/luozx/work/ark-runtime
 - `metrics.json`
 - `judge.md`
 
-## 3. 路线 prompt 模板
+脚本默认输出目录也应保持一致：
+
+```bash
+python3 scripts/agent_benchmark.py run --output-dir /tmp/quickdep-experiments/wave-2-core-benchmark
+```
+
+## 3. 自动化执行命令
+
+统一使用：
+
+- 路线 ID：`claude-default`
+- 路线 ID：`claude-native-only`
+- 路线 ID：`claude-quickdep-first`
+- 路线 ID：`claude-quickdep-plus-native-tools`
+
+报告里一律显示全称路线名，不再写单字母缩写。
+
+第一波入口选择实验：
+
+```bash
+python3 scripts/agent_benchmark.py run \
+  --repo /Users/luozx/work/ark-runtime \
+  --output-dir /tmp/quickdep-experiments/wave-1-entry-selection \
+  --scenarios s1 s2 s4 s5 \
+  --routes claude-default \
+  --max-workers 1
+```
+
+第二波核心 benchmark：
+
+```bash
+python3 scripts/agent_benchmark.py run \
+  --repo /Users/luozx/work/ark-runtime \
+  --output-dir /tmp/quickdep-experiments/wave-2-core-benchmark \
+  --scenarios s1 s2 s3 s5 \
+  --routes claude-native-only claude-quickdep-first claude-quickdep-plus-native-tools \
+  --max-workers 3
+```
+
+第三波增量更新专项：
+
+```bash
+python3 scripts/agent_benchmark.py run \
+  --repo /Users/luozx/work/ark-runtime \
+  --output-dir /tmp/quickdep-experiments/wave-3-developer-flow \
+  --scenarios s6 \
+  --routes claude-quickdep-first claude-quickdep-plus-native-tools \
+  --max-workers 2
+```
+
+生成 Markdown 汇总：
+
+```bash
+python3 scripts/agent_benchmark.py report \
+  --output-dir /tmp/quickdep-experiments/wave-2-core-benchmark
+```
+
+## 4. 路线 prompt 模板
 
 ### Claude 默认行为
 
@@ -121,7 +178,7 @@ quickdep status /Users/luozx/work/ark-runtime
 4. 不确定点
 ```
 
-## 4. 第一波实验清单
+## 5. 第一波实验清单
 
 ### 实验 1：Workflow 入口选择
 
@@ -175,7 +232,7 @@ quickdep status /Users/luozx/work/ark-runtime
 - Claude 第一跳是否使用 `locate_relevant_code`
 - 如果没有使用，是否至少使用 `get_task_context`
 
-## 5. 第二波实验清单
+## 6. 第二波实验清单
 
 ### 实验 5：工作流问题
 
@@ -233,7 +290,7 @@ RuntimeCore::next_conflict_queue_head 到 Scheduler::dispatchable_head 的真实
 2. Claude QuickDep First
 3. Claude QuickDep Plus Native Tools
 
-## 6. Judge 规则
+## 7. Judge 规则
 
 每个实验都要单独判断：
 
@@ -243,9 +300,9 @@ RuntimeCore::next_conflict_queue_head 到 Scheduler::dispatchable_head 的真实
 4. 最终结论有没有覆盖关键链路
 5. 有没有出现“答错但非常自信”的情况
 
-## 7. 禁止事项
+## 8. 禁止事项
 
 - 不要多个主场景同时堆满并发
 - 不要把旧实验数字直接拷进新报告
-- 不要用 `Claude Native Only`、`Claude QuickDep First`、`Claude QuickDep Plus Native Tools` 之外的临时路线名
+- 不要发明临时路线 ID，统一使用 `claude-default`、`claude-native-only`、`claude-quickdep-first`、`claude-quickdep-plus-native-tools`
 - 不要在报告里重新引入旧的单字母路线缩写

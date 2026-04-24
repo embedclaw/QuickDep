@@ -96,15 +96,15 @@ QuickDep currently supports these languages in the local graph pipeline:
 | C | `c`, `h` |
 | C++ | `cc`, `cpp`, `cxx`, `hh`, `hpp`, `hxx` |
 
-## Best Current Usage Pattern
+## Current Operator Guidance
 
-Today, QuickDep works best as a **QuickDep plus native-tools workflow**:
+Until the rebuilt Claude benchmark is rerun, treat QuickDep as a **QuickDep plus native-tools workflow**:
 
 1. Use QuickDep to narrow to the right 3-10 files, symbols, and call paths
 2. Let the agent read a much smaller amount of raw code
 3. Use implementation reading only where behavior details still matter
 
-That is a better fit for the current product than pretending the graph alone can answer every complex semantic question.
+That is current product guidance, not a published benchmark conclusion. The rebuilt experiment report should confirm or reject it.
 
 ## QuickDep vs Common Alternatives
 

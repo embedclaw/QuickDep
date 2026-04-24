@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run QuickDep-vs-native agent benchmark scenarios against ark-runtime."""
+"""Run QuickDep Claude experiment scenarios against local repositories."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from typing import Any
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 DEFAULT_TARGET_REPO = pathlib.Path("/Users/luozx/work/ark-runtime")
-DEFAULT_OUTPUT_DIR = pathlib.Path("/tmp/quickdep-benchmarks-v2")
+DEFAULT_OUTPUT_DIR = pathlib.Path("/tmp/quickdep-experiments")
 DEFAULT_QUICKDEP_BIN = REPO_ROOT / "target" / "debug" / "quickdep"
 DEFAULT_CLAUDE_BIN = pathlib.Path(shutil.which("claude") or "/opt/homebrew/bin/claude")
 SOURCE_EXTENSIONS = {
@@ -46,7 +46,71 @@ SOURCE_EXTENSIONS = {
     ".toml",
     ".md",
 }
-SOURCE_TOOLS = {"Bash", "Read", "Grep", "Glob", "LSP", "Edit", "Write", "NotebookEdit"}
+SEARCH_TOOL_NAMES = {"Grep", "Glob"}
+READ_TOOL_NAMES = {"Read"}
+SOURCE_PAYLOAD_TOOL_NAMES = {"LSP"}
+SHELL_SEARCH_PATTERN = re.compile(r"\b(rg|grep|ag|fd|find)\b")
+SHELL_READ_PATTERN = re.compile(r"\b(cat|sed|awk|head|tail|less|more)\b")
+
+ROUTE_DISPLAY_NAMES = {
+    "claude-default": "Claude 默认行为",
+    "claude-native-only": "Claude 原生工具 Only",
+    "claude-quickdep-first": "Claude QuickDep First",
+    "claude-quickdep-plus-native-tools": "Claude QuickDep Plus Native Tools",
+}
+ROUTE_ALIASES = {
+    "q": "claude-quickdep-first",
+    "n": "claude-native-only",
+    "h": "claude-quickdep-plus-native-tools",
+    "default": "claude-default",
+    "native": "claude-native-only",
+    "native-only": "claude-native-only",
+    "quickdep-first": "claude-quickdep-first",
+    "quickdep-plus-native-tools": "claude-quickdep-plus-native-tools",
+}
+BENCHMARK_ROUTE_IDS = (
+    "claude-native-only",
+    "claude-quickdep-first",
+    "claude-quickdep-plus-native-tools",
+)
+ALL_ROUTE_IDS = ("claude-default",) + BENCHMARK_ROUTE_IDS
+INCREMENTAL_ROUTE_IDS = (
+    "claude-quickdep-first",
+    "claude-quickdep-plus-native-tools",
+)
+
+ENTRY_SELECTION_EXPECTATIONS = {
+    "s1": {
+        "label": "Workflow 入口",
+        "expected_tools": (
+            "mcp__quickdep__analyze_workflow_context",
+            "mcp__quickdep__get_task_context",
+        ),
+    },
+    "s2": {
+        "label": "Behavior 入口",
+        "expected_tools": (
+            "mcp__quickdep__analyze_behavior_context",
+            "mcp__quickdep__get_task_context",
+        ),
+    },
+    "s4": {
+        "label": "Locate 入口",
+        "expected_tools": (
+            "mcp__quickdep__locate_relevant_code",
+            "mcp__quickdep__get_task_context",
+        ),
+    },
+    "s5": {
+        "label": "Impact 入口",
+        "expected_tools": (
+            "mcp__quickdep__analyze_change_impact",
+            "mcp__quickdep__get_task_context",
+        ),
+    },
+}
+CORE_BENCHMARK_SCENARIO_IDS = ("s1", "s2", "s3", "s5")
+DEVELOPER_FLOW_SCENARIO_IDS = ("s6",)
 
 
 @dataclass(frozen=True)
@@ -56,7 +120,7 @@ class Scenario:
     question: str
     gold_files: tuple[str, ...]
     gold_symbols: tuple[str, ...]
-    allowed_routes: tuple[str, ...] = ("q", "n", "h")
+    allowed_routes: tuple[str, ...] = ALL_ROUTE_IDS
     incremental_target: str | None = None
 
 
@@ -179,14 +243,34 @@ SCENARIOS: dict[str, Scenario] = {
         ),
         gold_files=("crates/ark-platform-server/src/lib.rs",),
         gold_symbols=("PlatformServer::health_report", "push_issue"),
-        allowed_routes=("q", "h"),
+        allowed_routes=INCREMENTAL_ROUTE_IDS,
         incremental_target="crates/ark-platform-server/src/lib.rs",
     ),
 }
 
 
 ROUTE_PROMPTS = {
-    "q": textwrap.dedent(
+    "claude-default": textwrap.dedent(
+        """\
+        你正在分析仓库：{repo_path}
+
+        请回答下面这个工程问题：
+        {question}
+
+        工作要求：
+        - 自主选择最合适的第一步，不要为了凑工具而盲目搜索
+        - 优先回答“先看哪里最有解释力”，而不是先做大范围搜索
+        - 在最终答案里说明你第一步为什么这样做
+
+        输出要求：
+        1. 结论
+        2. 第一跳工具和原因
+        3. 关键文件（最多 5 个）
+        4. 关键符号 / 调用链
+        5. 不确定点
+        """
+    ),
+    "claude-quickdep-first": textwrap.dedent(
         """\
         你正在分析仓库：{repo_path}
 
@@ -206,7 +290,7 @@ ROUTE_PROMPTS = {
         4. 不确定点
         """
     ),
-    "n": textwrap.dedent(
+    "claude-native-only": textwrap.dedent(
         """\
         你正在分析仓库：{repo_path}
 
@@ -225,7 +309,7 @@ ROUTE_PROMPTS = {
         4. 不确定点
         """
     ),
-    "h": textwrap.dedent(
+    "claude-quickdep-plus-native-tools": textwrap.dedent(
         """\
         你正在分析仓库：{repo_path}
 
@@ -250,6 +334,15 @@ ROUTE_PROMPTS = {
 def log(message: str) -> None:
     now = dt.datetime.now().strftime("%H:%M:%S")
     print(f"[{now}] {message}", flush=True)
+
+
+def normalize_route_id(value: str) -> str:
+    key = value.strip().lower()
+    return ROUTE_ALIASES.get(key, key)
+
+
+def route_display_name(route: str) -> str:
+    return ROUTE_DISPLAY_NAMES.get(route, route)
 
 
 def parse_args() -> argparse.Namespace:
@@ -278,8 +371,8 @@ def parse_args() -> argparse.Namespace:
     run.add_argument(
         "--routes",
         nargs="+",
-        default=["q", "n", "h"],
-        help="Routes to run",
+        default=list(BENCHMARK_ROUTE_IDS),
+        help=f"Routes to run ({', '.join(ALL_ROUTE_IDS)})",
     )
     run.add_argument(
         "--max-workers",
@@ -371,7 +464,7 @@ def run_command(
 
 
 def build_mcp_config(route: str, quickdep_bin: pathlib.Path) -> dict[str, Any]:
-    if route == "n":
+    if route == "claude-native-only":
         return {"mcpServers": {}}
     return {
         "mcpServers": {
@@ -402,6 +495,22 @@ def normalize_content(value: Any) -> str:
     if value is None:
         return ""
     return json.dumps(value, ensure_ascii=False, sort_keys=True)
+
+
+def is_search_tool(tool_name: str, input_text: str) -> bool:
+    if tool_name in SEARCH_TOOL_NAMES:
+        return True
+    return tool_name == "Bash" and bool(SHELL_SEARCH_PATTERN.search(input_text))
+
+
+def is_read_tool(tool_name: str, input_text: str) -> bool:
+    if tool_name in READ_TOOL_NAMES:
+        return True
+    return tool_name == "Bash" and bool(SHELL_READ_PATTERN.search(input_text))
+
+
+def counts_as_source_read(tool_name: str, input_text: str) -> bool:
+    return tool_name in SOURCE_PAYLOAD_TOOL_NAMES or is_read_tool(tool_name, input_text)
 
 
 def detect_files(text: str, repo_path: pathlib.Path) -> set[str]:
@@ -536,9 +645,16 @@ def collect_route_metrics(
         "tool_count": 0,
         "tool_names": [],
         "mcp_tool_count": 0,
+        "first_tool_name": None,
         "file_fanout": 0,
         "files_touched": [],
+        "file_fanout_before_first_hit": 0,
+        "files_touched_before_first_hit": [],
+        "search_tool_count_before_first_hit": 0,
+        "search_tool_names_before_first_hit": [],
+        "read_tool_count_before_first_hit": 0,
         "raw_source_chars": 0,
+        "raw_source_chars_before_first_hit": 0,
         "mcp_payload_chars": 0,
         "time_to_first_hit_ms": None,
         "refresh_after_edit_ms": None,
@@ -549,6 +665,7 @@ def collect_route_metrics(
         "status": "unknown",
     }
     files_touched: set[str] = set()
+    files_touched_before_first_hit: set[str] = set()
     first_hit_ms: float | None = None
     edit_ms: float | None = None
     first_refresh_ms: float | None = None
@@ -561,12 +678,13 @@ def collect_route_metrics(
         event_copy = dict(event)
         event_copy.pop("_elapsed_ms", None)
         event_text = normalize_content(event_copy)
+        event_has_hit = first_hit_text([event_text], scenario)
+        before_first_hit = first_hit_ms is None and not event_has_hit
 
         detected = detect_files(event_text, repo_path)
         files_touched.update(detected)
-
-        if first_hit_ms is None and first_hit_text([event_text], scenario):
-            first_hit_ms = elapsed_ms
+        if before_first_hit:
+            files_touched_before_first_hit.update(detected)
 
         if event.get("type") == "assistant":
             message = event.get("message", {})
@@ -579,15 +697,25 @@ def collect_route_metrics(
                 tool_id = item.get("id", "")
                 metrics["tool_count"] += 1
                 metrics["tool_names"].append(tool_name)
+                if metrics["first_tool_name"] is None:
+                    metrics["first_tool_name"] = tool_name
                 if tool_name.startswith("mcp__quickdep__"):
                     metrics["mcp_tool_count"] += 1
+                tool_input = item.get("input", {})
                 tool_inputs[tool_id] = {
                     "name": tool_name,
-                    "input": item.get("input", {}),
+                    "input": tool_input,
                     "elapsed_ms": elapsed_ms,
                 }
-                input_text = normalize_content(item.get("input", {}))
+                input_text = normalize_content(tool_input)
                 files_touched.update(detect_files(input_text, repo_path))
+                if before_first_hit:
+                    files_touched_before_first_hit.update(detect_files(input_text, repo_path))
+                    if is_search_tool(tool_name, input_text):
+                        metrics["search_tool_count_before_first_hit"] += 1
+                        metrics["search_tool_names_before_first_hit"].append(tool_name)
+                    if is_read_tool(tool_name, input_text):
+                        metrics["read_tool_count_before_first_hit"] += 1
                 if scenario.sid == "s6" and edit_ms is None:
                     if tool_name in {"Edit", "Write", "NotebookEdit"} and scenario.incremental_target in input_text:
                         edit_ms = elapsed_ms
@@ -603,13 +731,18 @@ def collect_route_metrics(
                     break
             tool_info = tool_inputs.get(tool_use_id, {})
             tool_name = tool_info.get("name", "")
+            tool_input_text = normalize_content(tool_info.get("input", {}))
             payload = message.get("tool_use_result", {}).get("content")
             payload_text = normalize_content(payload if payload is not None else message.get("content"))
             if tool_name.startswith("mcp__quickdep__"):
                 metrics["mcp_payload_chars"] += len(payload_text)
-            elif tool_name in SOURCE_TOOLS:
+            elif counts_as_source_read(tool_name, tool_input_text):
                 metrics["raw_source_chars"] += len(payload_text)
             files_touched.update(detect_files(payload_text, repo_path))
+            if before_first_hit:
+                files_touched_before_first_hit.update(detect_files(payload_text, repo_path))
+                if counts_as_source_read(tool_name, tool_input_text):
+                    metrics["raw_source_chars_before_first_hit"] += len(payload_text)
             if scenario.sid == "s6" and edit_ms is not None and first_refresh_ms is None:
                 if "push_issue" in payload_text:
                     first_refresh_ms = elapsed_ms
@@ -620,6 +753,9 @@ def collect_route_metrics(
             metrics["usage"] = event.get("usage", {})
             metrics["status"] = "success" if not event.get("is_error") else "error"
 
+        if first_hit_ms is None and event_has_hit:
+            first_hit_ms = elapsed_ms
+
     if not metrics["result_text"] and metrics["last_assistant_text"]:
         metrics["result_text"] = metrics["last_assistant_text"]
     if metrics["status"] == "unknown":
@@ -627,6 +763,8 @@ def collect_route_metrics(
 
     metrics["files_touched"] = sorted(files_touched)
     metrics["file_fanout"] = len(files_touched)
+    metrics["files_touched_before_first_hit"] = sorted(files_touched_before_first_hit)
+    metrics["file_fanout_before_first_hit"] = len(files_touched_before_first_hit)
     metrics["time_to_first_hit_ms"] = first_hit_ms
     if scenario.sid == "s6" and edit_ms is not None and first_refresh_ms is not None:
         metrics["refresh_after_edit_ms"] = max(0, first_refresh_ms - edit_ms)
@@ -739,6 +877,7 @@ def run_route(
             metrics["status"] = "timeout"
             metrics["timeout_seconds"] = route_timeout_seconds
         metrics["route"] = route
+        metrics["route_display_name"] = route_display_name(route)
         metrics["scenario"] = scenario.sid
         metrics["repo_path"] = str(repo_path)
         write_json(route_dir / "metrics.json", metrics)
@@ -862,47 +1001,109 @@ def run_scenario(
     write_json(judge_dir / "score.json", scores)
     notes_lines = []
     for route in sorted(scores):
-        notes_lines.append(f"{route}: score={scores[route]['score_0_to_5']} notes={scores[route]['notes']}")
+        notes_lines.append(
+            f"{route_display_name(route)}: score={scores[route]['score_0_to_5']} notes={scores[route]['notes']}"
+        )
     write_text(judge_dir / "notes.md", "\n".join(notes_lines) + ("\n" if notes_lines else ""))
     write_json(scenario_dir / "summary.json", results)
     return results
 
 
+def summarize_search_expansion(metrics: dict[str, Any]) -> str:
+    count = metrics.get("search_tool_count_before_first_hit", 0)
+    if not count:
+        return "否"
+    names = metrics.get("search_tool_names_before_first_hit", [])
+    if not names:
+        return "是"
+    return f"是 ({', '.join(names[:3])})"
+
+
+def entry_selection_row(
+    scenario_id: str,
+    scenario_dir: pathlib.Path,
+) -> list[str] | None:
+    if scenario_id not in ENTRY_SELECTION_EXPECTATIONS:
+        return None
+    route = "claude-default"
+    metrics_path = scenario_dir / route / "metrics.json"
+    if not metrics_path.exists():
+        return None
+    metrics = json.loads(metrics_path.read_text())
+    expectation = ENTRY_SELECTION_EXPECTATIONS[scenario_id]
+    first_tool = metrics.get("first_tool_name") or "-"
+    matched = first_tool in expectation["expected_tools"]
+    return [
+        expectation["label"],
+        route_display_name(route),
+        first_tool,
+        "是" if matched else "否",
+        summarize_search_expansion(metrics),
+        str(metrics.get("file_fanout_before_first_hit", "-")),
+        str(metrics.get("raw_source_chars_before_first_hit", "-")),
+        str(metrics.get("time_to_first_hit_ms", "-")),
+        metrics.get("status", "-"),
+    ]
+
+
 def generate_report(output_dir: pathlib.Path, markdown_path: pathlib.Path) -> pathlib.Path:
     scenario_dirs = sorted(output_dir.glob("scenario_*"))
     lines = [
-        "# QuickDep Agent Hybrid Benchmark Report",
+        "# QuickDep Claude Experiment Report",
         "",
         f"- Generated: {dt.datetime.now().isoformat()}",
         f"- Output dir: `{output_dir}`",
         "",
-        "## Summary",
+        "## Wave 1 Entry Selection",
         "",
-        "| Scenario | Route | Score | Duration ms | Tool count | File fan-out | Raw source chars | MCP payload chars | Total ctx tokens | Notes |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---|",
+        "| 场景 | 路线 | Claude 第一跳 | 是否命中正确入口 | 首次命中前是否搜索扩散 | 首次命中前触达文件数 | 首次命中前源码读取字符数 | 首次命中时间 ms | 状态 |",
+        "|---|---|---|---|---|---:|---:|---:|---|",
     ]
 
     for scenario_dir in scenario_dirs:
         scenario_id = scenario_dir.name.removeprefix("scenario_")
+        row = entry_selection_row(scenario_id, scenario_dir)
+        if row is not None:
+            lines.append("| " + " | ".join(row) + " |")
+
+    lines.extend(
+        [
+            "",
+            "## Wave 2 Core Benchmark",
+            "",
+            "| Scenario | Route | Score | Duration ms | Tool count | File fan-out | Raw source chars | MCP payload chars | Total ctx tokens | Notes |",
+            "|---|---|---:|---:|---:|---:|---:|---:|---:|---|",
+        ]
+    )
+
+    for scenario_dir in scenario_dirs:
+        scenario_id = scenario_dir.name.removeprefix("scenario_")
+        if scenario_id not in CORE_BENCHMARK_SCENARIO_IDS:
+            continue
         score_path = scenario_dir / "judge" / "score.json"
         scores = json.loads(score_path.read_text()) if score_path.exists() else {}
-        for route_dir in sorted(path for path in scenario_dir.iterdir() if path.is_dir() and path.name in {"q", "n", "h"}):
+        for route in BENCHMARK_ROUTE_IDS:
+            route_dir = scenario_dir / route
+            if not route_dir.exists():
+                continue
             metrics_path = route_dir / "metrics.json"
             if not metrics_path.exists():
                 continue
             metrics = json.loads(metrics_path.read_text())
             status = metrics.get("status")
-            score = scores.get(route_dir.name, {}).get("score_0_to_5", "-")
-            notes = ", ".join(scores.get(route_dir.name, {}).get("notes", []))
+            score = scores.get(route, {}).get("score_0_to_5", "-")
+            notes = ", ".join(scores.get(route, {}).get("notes", []))
             if status == "skipped":
-                lines.append(f"| {scenario_id} | {route_dir.name} | - | - | - | - | - | - | - | skipped |")
+                lines.append(
+                    f"| {scenario_id} | {route_display_name(route)} | - | - | - | - | - | - | - | skipped |"
+                )
                 continue
             usage = metrics.get("usage", {})
             total_ctx_tokens = usage.get("input_tokens", 0) + usage.get("cache_read_input_tokens", 0)
             lines.append(
                 "| {scenario} | {route} | {score} | {duration} | {tools} | {fanout} | {raw_chars} | {mcp_chars} | {ctx} | {notes} |".format(
                     scenario=scenario_id,
-                    route=route_dir.name,
+                    route=route_display_name(route),
                     score=score,
                     duration=metrics.get("duration_ms", "-"),
                     tools=metrics.get("tool_count", "-"),
@@ -913,6 +1114,39 @@ def generate_report(output_dir: pathlib.Path, markdown_path: pathlib.Path) -> pa
                     notes=notes or "-",
                 )
             )
+
+    if any((output_dir / f"scenario_{scenario_id}").exists() for scenario_id in DEVELOPER_FLOW_SCENARIO_IDS):
+        lines.extend(
+            [
+                "",
+                "## Wave 3 Developer Flow",
+                "",
+                "| Scenario | Route | Status | Refresh after edit ms | File fan-out | Notes |",
+                "|---|---|---|---:|---:|---|",
+            ]
+        )
+        for scenario_id in DEVELOPER_FLOW_SCENARIO_IDS:
+            scenario_dir = output_dir / f"scenario_{scenario_id}"
+            if not scenario_dir.exists():
+                continue
+            score_path = scenario_dir / "judge" / "score.json"
+            scores = json.loads(score_path.read_text()) if score_path.exists() else {}
+            for route in INCREMENTAL_ROUTE_IDS:
+                metrics_path = scenario_dir / route / "metrics.json"
+                if not metrics_path.exists():
+                    continue
+                metrics = json.loads(metrics_path.read_text())
+                notes = ", ".join(scores.get(route, {}).get("notes", [])) or "-"
+                lines.append(
+                    "| {scenario} | {route} | {status} | {refresh} | {fanout} | {notes} |".format(
+                        scenario=scenario_id,
+                        route=route_display_name(route),
+                        status=metrics.get("status", "-"),
+                        refresh=metrics.get("refresh_after_edit_ms", "-"),
+                        fanout=metrics.get("file_fanout", "-"),
+                        notes=notes,
+                    )
+                )
 
     lines.extend(["", "## Per Scenario", ""])
     for scenario_dir in scenario_dirs:
@@ -926,14 +1160,20 @@ def generate_report(output_dir: pathlib.Path, markdown_path: pathlib.Path) -> pa
         lines.append(f"- Gold files: {', '.join(scenario.gold_files)}")
         lines.append(f"- Gold symbols: {', '.join(scenario.gold_symbols)}")
         lines.append("")
-        for route in ("q", "n", "h"):
+        if scenario_id in ENTRY_SELECTION_EXPECTATIONS:
+            expectation = ENTRY_SELECTION_EXPECTATIONS[scenario_id]
+            lines.append(
+                f"- Expected first entry: {', '.join(expectation['expected_tools'])}"
+            )
+            lines.append("")
+        for route in ALL_ROUTE_IDS:
             metrics_path = scenario_dir / route / "metrics.json"
             if not metrics_path.exists():
                 continue
             metrics = json.loads(metrics_path.read_text())
             answer_path = scenario_dir / route / "answer.md"
             answer = answer_path.read_text().strip() if answer_path.exists() else ""
-            lines.append(f"#### Route {route.upper()}")
+            lines.append(f"#### {route_display_name(route)}")
             if metrics.get("status") == "skipped":
                 lines.append("")
                 lines.append("- Skipped")
@@ -943,10 +1183,18 @@ def generate_report(output_dir: pathlib.Path, markdown_path: pathlib.Path) -> pa
             total_ctx_tokens = usage.get("input_tokens", 0) + usage.get("cache_read_input_tokens", 0)
             lines.append("")
             lines.append(f"- Score: {scores.get(route, {}).get('score_0_to_5', '-')}/5")
+            lines.append(f"- First tool: {metrics.get('first_tool_name') or '-'}")
             lines.append(f"- Duration ms: {metrics.get('duration_ms')}")
             lines.append(f"- Tool count: {metrics.get('tool_count')}")
             lines.append(f"- File fan-out: {metrics.get('file_fanout')}")
+            lines.append(f"- File fan-out before first hit: {metrics.get('file_fanout_before_first_hit')}")
+            lines.append(
+                f"- Search expansion before first hit: {summarize_search_expansion(metrics)}"
+            )
             lines.append(f"- Raw source chars: {metrics.get('raw_source_chars')}")
+            lines.append(
+                f"- Raw source chars before first hit: {metrics.get('raw_source_chars_before_first_hit')}"
+            )
             lines.append(f"- MCP payload chars: {metrics.get('mcp_payload_chars')}")
             lines.append(f"- Total ctx tokens: {total_ctx_tokens}")
             if metrics.get("refresh_after_edit_ms") is not None:
@@ -967,9 +1215,11 @@ def generate_report(output_dir: pathlib.Path, markdown_path: pathlib.Path) -> pa
 
 def run_benchmark(args: argparse.Namespace) -> None:
     scenarios = select_scenarios(args.scenarios)
-    routes = [route.lower() for route in args.routes]
-    if any(route not in {"q", "n", "h"} for route in routes):
-        raise SystemExit("routes must be chosen from q, n, h")
+    routes = list(dict.fromkeys(normalize_route_id(route) for route in args.routes))
+    invalid_routes = [route for route in routes if route not in ALL_ROUTE_IDS]
+    if invalid_routes:
+        supported = ", ".join(ALL_ROUTE_IDS)
+        raise SystemExit(f"routes must be chosen from: {supported}")
     if args.max_workers > 4:
         raise SystemExit("--max-workers must be <= 4")
 

@@ -27,32 +27,52 @@
 
 - 状态：`Pending`
 - 问题：为什么审批通过后仍可能停留在 `Queued`
+- 期望入口：`analyze_workflow_context` 或 `get_task_context`
 - Claude 第一跳：
 - 是否命中正确入口：
+- 首次命中前是否搜索扩散：
+- 首次命中前触达文件数：
+- 首次命中前源码读取字符数：
+- 首次命中时间：
 - 备注：
 
 ### Behavior 入口
 
 - 状态：`Pending`
 - 问题：为什么 `verify_pre_dispatch` 失败会升级成 turn failure
+- 期望入口：`analyze_behavior_context` 或 `get_task_context`
 - Claude 第一跳：
 - 是否命中正确入口：
+- 首次命中前是否搜索扩散：
+- 首次命中前触达文件数：
+- 首次命中前源码读取字符数：
+- 首次命中时间：
 - 备注：
 
 ### Impact 入口
 
 - 状态：`Pending`
 - 问题：如果修改 `next_conflict_queue_head`，风险面在哪里
+- 期望入口：`analyze_change_impact` 或 `get_task_context`
 - Claude 第一跳：
 - 是否命中正确入口：
+- 首次命中前是否搜索扩散：
+- 首次命中前触达文件数：
+- 首次命中前源码读取字符数：
+- 首次命中时间：
 - 备注：
 
 ### Locate 入口
 
 - 状态：`Pending`
 - 问题：如果要先理解 `PlatformServer::health_report`，最值得先看哪些局部点
+- 期望入口：`locate_relevant_code` 或 `get_task_context`
 - Claude 第一跳：
 - 是否命中正确入口：
+- 首次命中前是否搜索扩散：
+- 首次命中前触达文件数：
+- 首次命中前源码读取字符数：
+- 首次命中时间：
 - 备注：
 
 ## 4. 第二波核心 benchmark
