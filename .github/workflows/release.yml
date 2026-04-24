@@ -1,0 +1,205 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            archive: tar.gz
+            asset_name: quickdep-linux-x86_64.tar.gz
+            binary_name: quickdep
+            use_cross: false
+          - name: linux-aarch64
+            runner: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            archive: tar.gz
+            asset_name: quickdep-linux-aarch64.tar.gz
+            binary_name: quickdep
+            use_cross: true
+          - name: darwin-x86_64
+            runner: macos-13
+            target: x86_64-apple-darwin
+            archive: tar.gz
+            asset_name: quickdep-darwin-x86_64.tar.gz
+            binary_name: quickdep
+            use_cross: false
+          - name: darwin-aarch64
+            runner: macos-14
+            target: aarch64-apple-darwin
+            archive: tar.gz
+            asset_name: quickdep-darwin-aarch64.tar.gz
+            binary_name: quickdep
+            use_cross: false
+          - name: windows-x86_64
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive: zip
+            asset_name: quickdep-windows-x86_64.zip
+            binary_name: quickdep.exe
+            use_cross: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cross
+        if: matrix.use_cross
+        run: cargo install cross --git https://github.com/cross-rs/cross --locked
+
+      - name: Build release binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ matrix.use_cross }}" = "true" ]; then
+            cross build --release --target "${{ matrix.target }}"
+          else
+            cargo build --release --target "${{ matrix.target }}"
+          fi
+
+      - name: Package tar.gz artifact
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/package
+          cp "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "dist/package/${{ matrix.binary_name }}"
+          tar -C dist/package -czf "dist/${{ matrix.asset_name }}" "${{ matrix.binary_name }}"
+
+      - name: Package zip artifact
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/package | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "dist/package/${{ matrix.binary_name }}"
+          Compress-Archive -Path "dist/package/${{ matrix.binary_name }}" -DestinationPath "dist/${{ matrix.asset_name }}" -Force
+
+      - name: Upload packaged artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: dist/${{ matrix.asset_name }}
+
+  publish-release:
+    name: Publish GitHub release
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Collect release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          find dist -type f \( -name '*.tar.gz' -o -name '*.zip' \) -exec cp {} release/ \;
+          (cd release && sha256sum * > checksums.txt)
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*
+
+  publish-npm:
+    name: Publish npm wrapper
+    runs-on: ubuntu-latest
+    needs: publish-release
+    if: ${{ secrets.NPM_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Set npm package version
+        working-directory: npm/quickdep
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          npm version "$VERSION" --no-git-tag-version
+
+      - name: Publish npm package
+        working-directory: npm/quickdep
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
+
+  update-homebrew-tap:
+    name: Update Homebrew tap
+    runs-on: ubuntu-latest
+    needs: publish-release
+    if: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Collect checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          find dist -type f \( -name '*.tar.gz' -o -name '*.zip' \) -exec cp {} release/ \;
+          (cd release && sha256sum * > checksums.txt)
+
+      - name: Checkout tap repository
+        uses: actions/checkout@v4
+        with:
+          repository: Northcipher/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Update formula
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 packaging/homebrew/update_formula.py \
+            --version "${GITHUB_REF_NAME#v}" \
+            --repository "Northcipher/QuickDep" \
+            --tap-repo tap \
+            --darwin-aarch64-sha "$(sha256sum release/quickdep-darwin-aarch64.tar.gz | awk '{print $1}')" \
+            --darwin-x86_64-sha "$(sha256sum release/quickdep-darwin-x86_64.tar.gz | awk '{print $1}')" \
+            --linux-aarch64-sha "$(sha256sum release/quickdep-linux-aarch64.tar.gz | awk '{print $1}')" \
+            --linux-x86_64-sha "$(sha256sum release/quickdep-linux-x86_64.tar.gz | awk '{print $1}')"
+
+      - name: Commit formula update
+        shell: bash
+        working-directory: tap
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/quickdep.rb
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: update quickdep ${GITHUB_REF_NAME#v}"
+          git push

@@ -1,0 +1,32 @@
+{
+  "name": "@northcipher/quickdep",
+  "version": "0.1.0",
+  "description": "Binary wrapper for QuickDep",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Northcipher/QuickDep.git"
+  },
+  "homepage": "https://github.com/Northcipher/QuickDep",
+  "bin": {
+    "quickdep": "bin/quickdep.js"
+  },
+  "files": [
+    "bin",
+    "scripts",
+    "README.md"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/install.mjs"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "tar": "^7.4.3"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,92 @@
+[package]
+name = "quickdep"
+version = "0.1.0"
+edition = "2021"
+description = "A Rust MCP service for scanning project code interface dependencies"
+license = "MIT"
+repository = "https://github.com/Northcipher/QuickDep"
+keywords = ["mcp", "dependency", "code-analysis", "tree-sitter"]
+categories = ["development-tools", "command-line-utilities"]
+
+[dependencies]
+# Tree-sitter - code parsing
+tree-sitter = "0.24"
+tree-sitter-rust = "0.23"
+tree-sitter-typescript = "0.23"
+tree-sitter-python = "0.23"
+tree-sitter-go = "0.23"
+tree-sitter-c = "0.23"
+tree-sitter-cpp = "0.23"
+tree-sitter-java = "0.23"
+tree-sitter-c-sharp = "=0.23.1"
+tree-sitter-kotlin-ng = "1.1.0"
+tree-sitter-php = "=0.23.11"
+tree-sitter-ruby = "0.23.1"
+tree-sitter-swift = "0.6.0"
+tree-sitter-objc = "3.0.2"
+
+# SQLite - storage
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# MCP protocol
+rmcp = { version = "1.5.0", features = ["client", "transport-io", "transport-streamable-http-server"] }
+
+# File watching
+notify = "8"
+
+# Hash - blake3 for fast hashing
+blake3 = "1"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+json5 = "0.4"
+toml = "0.8"
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+axum = { version = "0.8", features = ["ws"] }
+tower-http = { version = "0.6", features = ["cors"] }
+
+# Path handling
+walkdir = "2"
+glob-match = "0.2"
+path-clean = "0.1"
+
+# UUID for unique IDs
+uuid = { version = "1", features = ["v4", "fast-rng"] }
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Fuzzy search (optional, for future)
+fuse-rust = "0.2"
+
+[dev-dependencies]
+futures-util = "0.3"
+tempfile = "3"
+pretty_assertions = "1"
+tungstenite = "0.28"
+tokio-tungstenite = "0.28"
+tower = { version = "0.5", features = ["util"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true

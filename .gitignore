@@ -1,0 +1,38 @@
+# Rust
+/target/
+Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# QuickDep cache (generated at runtime)
+.quickdep/
+
+# Logs
+*.log
+
+# Local-only notes and personal config
+/.claude/*.local.md
+/.local/
+/quickdep.toml
+/references/
+
+# Test artifacts
+tests/fixtures/**/.quickdep/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Web UI
+/web/node_modules/
+/web/dist/
+/web/.vite/
