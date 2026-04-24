@@ -83,6 +83,7 @@ QuickDep 的价值就是先把仓库变成一层结构化收敛层，再让 Agen
 
 完整实验记录见：
 
+- [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md)
 - [docs/AGENT_HYBRID_BENCHMARK_REPORT.md](docs/AGENT_HYBRID_BENCHMARK_REPORT.md)
 
 ## 适用场景

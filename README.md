@@ -77,6 +77,7 @@ That is the product claim the data supports today:
 
 Detailed benchmark notes:
 
+- [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md)
 - [docs/AGENT_HYBRID_BENCHMARK_REPORT.md](docs/AGENT_HYBRID_BENCHMARK_REPORT.md)
 
 ## Good Fit

@@ -1,5 +1,9 @@
 # QuickDep Agent 混合基准测试报告
 
+> 状态说明：这是当前用于 `S1-S5` 共同场景平均值和 `S6` watcher 结果的广义基线报告。
+> 如果你要看 Rust 调用链修复后的最新定向复跑，请看 [ARK_RUNTIME_AGENT_COMPARISON_V3.md](ARK_RUNTIME_AGENT_COMPARISON_V3.md)。
+> 不要把 `V3` 的定向结果直接混进本报告的 `S1-S5` 平均表。
+
 ## 1. 结论先行
 
 这轮实验的核心结论不是“QuickDep 全面胜出”，而是：

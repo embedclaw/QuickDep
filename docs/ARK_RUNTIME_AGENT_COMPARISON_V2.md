@@ -1,5 +1,9 @@
 # QuickDep on `ark-runtime`: Claude 实验对比 V2
 
+> 状态说明：这是历史实验记录。
+> 当前如果要引用最新结果，请优先看 [AGENT_HYBRID_BENCHMARK_REPORT.md](AGENT_HYBRID_BENCHMARK_REPORT.md) 和 [ARK_RUNTIME_AGENT_COMPARISON_V3.md](ARK_RUNTIME_AGENT_COMPARISON_V3.md)。
+> V2 保留的价值主要是展示当时暴露过哪些问题，以及后续修复前的基线。
+
 ## 1. 结论摘要
 
 这轮实验基本支撑了一个更准确的产品故事：

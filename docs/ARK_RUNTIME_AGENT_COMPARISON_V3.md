@@ -1,5 +1,8 @@
 # QuickDep on `ark-runtime`: Claude 第三轮对比实验 V3
 
+> 状态说明：这是当前最新的定向复跑报告，用来验证 Rust 调用链修复后的收益。
+> 它只覆盖 `S1 / S2 / S3 / S5`，不是完整替代 [AGENT_HYBRID_BENCHMARK_REPORT.md](AGENT_HYBRID_BENCHMARK_REPORT.md) 的广义平均基线。
+
 ## 1. 这轮实验要回答什么
 
 这轮不是重新证明一个空泛结论，而是收敛两个具体问题：

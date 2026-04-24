@@ -674,7 +674,8 @@ Gold：
 
 建议最终写成：
 
-- `docs/ARK_RUNTIME_AGENT_COMPARISON_V2.md`
+- `docs/ARK_RUNTIME_AGENT_COMPARISON_<round>.md`
+- `docs/AGENT_HYBRID_BENCHMARK_REPORT.md`
 - `docs/AGENT_CONTEXT_FAILURE_ANALYSIS.md`
 
 ---
