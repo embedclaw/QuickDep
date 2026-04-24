@@ -22,9 +22,20 @@ from typing import Any
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 DEFAULT_TARGET_REPO = pathlib.Path("/Users/luozx/work/ark-runtime")
+DEFAULT_BENCH_REPOS_ROOT = pathlib.Path(
+    os.environ.get("QUICKDEP_BENCH_REPOS_ROOT", "/Users/luozx/work/bench-repos")
+)
 DEFAULT_OUTPUT_DIR = pathlib.Path("/tmp/quickdep-experiments")
 DEFAULT_QUICKDEP_BIN = REPO_ROOT / "target" / "debug" / "quickdep"
 DEFAULT_CLAUDE_BIN = pathlib.Path(shutil.which("claude") or "/opt/homebrew/bin/claude")
+BENCH_REPO_DIRS = {
+    "tokio": "tokio-master",
+    "nest": "nest-master",
+    "gin": "gin-master",
+    "requests": "requests-main",
+    "fmt": "fmt-main",
+    "redis": "redis-unstable",
+}
 SOURCE_EXTENSIONS = {
     ".rs",
     ".py",
@@ -51,6 +62,9 @@ READ_TOOL_NAMES = {"Read"}
 SOURCE_PAYLOAD_TOOL_NAMES = {"LSP"}
 SHELL_SEARCH_PATTERN = re.compile(r"\b(rg|grep|ag|fd|find)\b")
 SHELL_READ_PATTERN = re.compile(r"\b(cat|sed|awk|head|tail|less|more)\b")
+RELATIVE_FILE_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9_./+\-])([A-Za-z0-9_+\-]+(?:/[A-Za-z0-9_./+\-]+)*\.[A-Za-z0-9_+\-]+)"
+)
 
 ROUTE_DISPLAY_NAMES = {
     "claude-default": "Claude 默认行为",
@@ -110,7 +124,16 @@ ENTRY_SELECTION_EXPECTATIONS = {
     },
 }
 CORE_BENCHMARK_SCENARIO_IDS = ("s1", "s2", "s3", "s5")
-DEVELOPER_FLOW_SCENARIO_IDS = ("s6",)
+DEVELOPER_FLOW_SCENARIO_IDS = ("s6", "s7", "s8")
+CROSS_LANGUAGE_SCENARIO_IDS = ("s9", "s10", "s11", "s12", "s13")
+CROSS_LANGUAGE_ROUTE_IDS = (
+    "claude-quickdep-plus-native-tools",
+    "claude-native-only",
+)
+DEVELOPER_FLOW_ROUTE_IDS = (
+    "claude-default",
+    "claude-quickdep-plus-native-tools",
+)
 
 
 @dataclass(frozen=True)
@@ -122,6 +145,9 @@ class Scenario:
     gold_symbols: tuple[str, ...]
     allowed_routes: tuple[str, ...] = ALL_ROUTE_IDS
     incremental_target: str | None = None
+    prompt_context: str | None = None
+    repo_name: str | None = None
+    language: str | None = None
 
 
 SCENARIOS: dict[str, Scenario] = {
@@ -245,6 +271,150 @@ SCENARIOS: dict[str, Scenario] = {
         gold_symbols=("PlatformServer::health_report", "push_issue"),
         allowed_routes=INCREMENTAL_ROUTE_IDS,
         incremental_target="crates/ark-platform-server/src/lib.rs",
+    ),
+    "s7": Scenario(
+        sid="s7",
+        title="No-Anchor Workflow Triage",
+        question=(
+            "审批已经点过通过了，但这个 execution 还是没跑起来，一直卡在排队。"
+            "先别全仓库乱搜，告诉我最应该先看的链路和关键位置。"
+        ),
+        gold_files=(
+            "crates/ark-store/src/write.rs",
+            "crates/ark-runtime/src/lib.rs",
+            "crates/ark-runtime/src/core_flow_service.rs",
+            "crates/ark-runtime/src/flow.rs",
+            "crates/ark-scheduler/src/lib.rs",
+        ),
+        gold_symbols=(
+            "approval_resolve",
+            "approve_pending_approval",
+            "resume_approved_execution",
+            "prepare_execution_dispatch",
+            "Scheduler::admit",
+        ),
+        allowed_routes=DEVELOPER_FLOW_ROUTE_IDS,
+    ),
+    "s8": Scenario(
+        sid="s8",
+        title="Editor Context Risk Triage",
+        question=(
+            "基于当前编辑器上下文，帮我判断如果我要改这里，最应该先看的局部点和回归风险是什么。"
+        ),
+        gold_files=(
+            "crates/ark-runtime/src/flow.rs",
+            "crates/ark-runtime/src/lib.rs",
+            "crates/ark-execution/src/lib.rs",
+            "crates/ark-store/src/read.rs",
+            "crates/ark-scheduler/src/lib.rs",
+        ),
+        gold_symbols=(
+            "RuntimeCore::next_conflict_queue_head",
+            "ExecutionService::next_conflict_queue_head",
+            "Store::list_concurrency_window",
+            "Scheduler::dispatchable_head",
+            "RuntimeCore::apply_turn_failure",
+            "Runtime::runtime_cancel",
+        ),
+        allowed_routes=DEVELOPER_FLOW_ROUTE_IDS,
+        prompt_context=textwrap.dedent(
+            """\
+            编辑器上下文：
+            - active_file: crates/ark-runtime/src/flow.rs
+            - selection_symbol: RuntimeCore::next_conflict_queue_head
+            - 目标：先判断改动风险和最值得看的局部点
+            """
+        ).strip(),
+    ),
+    "s9": Scenario(
+        sid="s9",
+        title="tokio Builder Build Boundary",
+        question=(
+            "如果我要理解 `Builder::build` 是如何把配置分流到不同 runtime 实现的，"
+            "最值得先看的局部点是什么？目标是尽量少读无关代码。"
+        ),
+        gold_files=("tokio/src/runtime/builder.rs",),
+        gold_symbols=(
+            "Builder::build",
+            "Builder::build_current_thread_runtime",
+            "Builder::build_threaded_runtime",
+        ),
+        allowed_routes=CROSS_LANGUAGE_ROUTE_IDS,
+        repo_name="tokio",
+        language="Rust",
+    ),
+    "s10": Scenario(
+        sid="s10",
+        title="nest Factory Create Boundary",
+        question=(
+            "如果我要理解 `NestFactoryStatic.create` 是如何把应用初始化起来的，"
+            "最值得先看的局部点是什么？目标是尽量少读无关代码。"
+        ),
+        gold_files=("packages/core/nest-factory.ts",),
+        gold_symbols=(
+            "NestFactoryStatic.create",
+            "NestFactoryStatic.initialize",
+            "NestFactoryStatic.createNestInstance",
+            "NestFactoryStatic.createAdapterProxy",
+        ),
+        allowed_routes=CROSS_LANGUAGE_ROUTE_IDS,
+        repo_name="nest",
+        language="TypeScript",
+    ),
+    "s11": Scenario(
+        sid="s11",
+        title="gin HTTP Dispatch Boundary",
+        question=(
+            "如果我要理解 `Engine.handleHTTPRequest` 的请求分发逻辑，"
+            "最值得先看的局部点是什么？目标是尽量少读无关代码。"
+        ),
+        gold_files=("gin.go", "tree.go"),
+        gold_symbols=(
+            "Engine.handleHTTPRequest",
+            "getValue",
+            "serveError",
+            "redirectTrailingSlash",
+            "redirectFixedPath",
+        ),
+        allowed_routes=CROSS_LANGUAGE_ROUTE_IDS,
+        repo_name="gin",
+        language="Go",
+    ),
+    "s12": Scenario(
+        sid="s12",
+        title="requests Session Request Boundary",
+        question=(
+            "如果我要理解 `Session.request` 的主流程，最值得先看的局部点是什么？"
+            "目标是尽量少读无关代码。"
+        ),
+        gold_files=("src/requests/sessions.py",),
+        gold_symbols=(
+            "Session.request",
+            "Session.prepare_request",
+            "Session.send",
+            "Session.merge_environment_settings",
+        ),
+        allowed_routes=CROSS_LANGUAGE_ROUTE_IDS,
+        repo_name="requests",
+        language="Python",
+    ),
+    "s13": Scenario(
+        sid="s13",
+        title="fmt fdopen Boundary",
+        question=(
+            "如果我要理解 `file::fdopen` 的局部逻辑，最值得先看的局部点是什么？"
+            "目标是尽量少读无关代码。"
+        ),
+        gold_files=("src/os.cc", "include/fmt/os.h"),
+        gold_symbols=(
+            "file::fdopen",
+            "buffered_file",
+            "buffered_file::close",
+            "buffered_file::descriptor",
+        ),
+        allowed_routes=CROSS_LANGUAGE_ROUTE_IDS,
+        repo_name="fmt",
+        language="C++",
     ),
 }
 
@@ -429,7 +599,22 @@ def parse_args() -> argparse.Namespace:
 
 def select_scenarios(values: list[str]) -> list[Scenario]:
     if values == ["all"]:
-        return [SCENARIOS[key] for key in ("s1", "s2", "s3", "s4", "s5", "s6")]
+        ordered = (
+            "s1",
+            "s2",
+            "s3",
+            "s4",
+            "s5",
+            "s6",
+            "s7",
+            "s8",
+            "s9",
+            "s10",
+            "s11",
+            "s12",
+            "s13",
+        )
+        return [SCENARIOS[key] for key in ordered]
     selected: list[Scenario] = []
     for value in values:
         key = value.lower()
@@ -437,6 +622,22 @@ def select_scenarios(values: list[str]) -> list[Scenario]:
             raise SystemExit(f"unknown scenario: {value}")
         selected.append(SCENARIOS[key])
     return selected
+
+
+def resolve_scenario_repo_path(scenario: Scenario, default_repo: pathlib.Path) -> pathlib.Path:
+    if scenario.repo_name is None:
+        return default_repo
+
+    repo_dir = BENCH_REPO_DIRS.get(scenario.repo_name)
+    if repo_dir is None:
+        raise SystemExit(f"missing benchmark repo mapping for scenario {scenario.sid}: {scenario.repo_name}")
+
+    repo_path = DEFAULT_BENCH_REPOS_ROOT / repo_dir
+    if not repo_path.exists():
+        raise SystemExit(
+            f"benchmark repo for scenario {scenario.sid} not found: {repo_path}"
+        )
+    return repo_path
 
 
 def ensure_quickdep_scan(quickdep_bin: pathlib.Path, repo: pathlib.Path) -> None:
@@ -516,14 +717,14 @@ def counts_as_source_read(tool_name: str, input_text: str) -> bool:
 def detect_files(text: str, repo_path: pathlib.Path) -> set[str]:
     found: set[str] = set()
     absolute_pattern = re.compile(re.escape(str(repo_path)) + r"/[A-Za-z0-9_./+\-]+")
-    relative_pattern = re.compile(r"(?:crates|apps|src|tests|docs)/[A-Za-z0-9_./+\-]+\.[A-Za-z0-9_+\-]+")
 
     for match in absolute_pattern.findall(text):
         path = pathlib.Path(match)
         if path.suffix in SOURCE_EXTENSIONS and path.exists():
             found.add(str(path.resolve()))
-    for match in relative_pattern.findall(text):
-        path = repo_path / match
+    for match in RELATIVE_FILE_PATTERN.findall(text):
+        candidate = match.rstrip(".,:;!?)]}\"'`")
+        path = repo_path / candidate
         if path.suffix in SOURCE_EXTENSIONS and path.exists():
             found.add(str(path.resolve()))
     return found
@@ -598,6 +799,14 @@ def cleanup_worktree(base_repo: pathlib.Path, worktree_path: pathlib.Path | None
 
 def build_prompt(route: str, repo_path: pathlib.Path, scenario: Scenario) -> str:
     prompt = ROUTE_PROMPTS[route].format(repo_path=repo_path, question=scenario.question)
+    if scenario.prompt_context:
+        prompt += textwrap.dedent(
+            f"""
+
+            补充上下文：
+            {scenario.prompt_context}
+            """
+        )
     max_tools = 12 if scenario.sid == "s6" else 8
     prompt += textwrap.dedent(
         f"""
@@ -907,13 +1116,23 @@ def score_route(scenario: Scenario, route: str, metrics: dict[str, Any]) -> dict
             score += 1
         else:
             notes.append("缺少完整调用链")
-    elif scenario.sid == "s5":
+    elif scenario.sid in {"s5", "s8"}:
         for keyword in ("approval_resolve", "apply_turn_failure", "runtime_cancel"):
             if keyword in answer:
                 score += 1
                 break
         else:
             notes.append("缺少关键恢复路径")
+    elif scenario.sid == "s7":
+        keyword_hits = sum(
+            1
+            for keyword in ("approval_resolve", "resume_approved_execution", "Scheduler::admit")
+            if keyword in answer
+        )
+        if keyword_hits >= 2:
+            score += 1
+        else:
+            notes.append("未明确收敛到审批恢复主链路")
     elif scenario.sid == "s6":
         refresh = metrics.get("refresh_after_edit_ms")
         if refresh is not None:
@@ -923,6 +1142,12 @@ def score_route(scenario: Scenario, route: str, metrics: dict[str, Any]) -> dict
             notes.append("看到了新符号，但未能量化刷新延迟")
         else:
             notes.append("未观察到增量刷新")
+    elif scenario.sid in {"s4", *CROSS_LANGUAGE_SCENARIO_IDS}:
+        fanout = metrics.get("file_fanout", 0)
+        if fanout <= max(5, len(scenario.gold_files) + 2):
+            score += 1
+        else:
+            notes.append("局部边界问题的阅读范围仍偏大")
     else:
         if symbol_hits >= max(2, len(scenario.gold_symbols) // 2):
             score += 1
@@ -955,6 +1180,7 @@ def run_scenario(
 ) -> dict[str, Any]:
     scenario_dir = output_dir / f"scenario_{scenario.sid}"
     scenario_dir.mkdir(parents=True, exist_ok=True)
+    scenario_repo = resolve_scenario_repo_path(scenario, base_repo)
     selected_routes = [route for route in routes if route in scenario.allowed_routes]
     skipped_routes = [route for route in routes if route not in scenario.allowed_routes]
     for route in skipped_routes:
@@ -978,7 +1204,7 @@ def run_scenario(
                 run_route,
                 route=route,
                 scenario=scenario,
-                base_repo=base_repo,
+                base_repo=scenario_repo,
                 scenario_dir=scenario_dir,
                 claude_bin=claude_bin,
                 quickdep_bin=quickdep_bin,
@@ -1121,29 +1347,71 @@ def generate_report(output_dir: pathlib.Path, markdown_path: pathlib.Path) -> pa
                 "",
                 "## Wave 3 Developer Flow",
                 "",
-                "| Scenario | Route | Status | Refresh after edit ms | File fan-out | Notes |",
-                "|---|---|---|---:|---:|---|",
+                "| Scenario | Route | Score | First tool | First hit ms | Refresh after edit ms | File fan-out | Notes |",
+                "|---|---|---:|---|---:|---:|---:|---|",
             ]
         )
         for scenario_id in DEVELOPER_FLOW_SCENARIO_IDS:
             scenario_dir = output_dir / f"scenario_{scenario_id}"
             if not scenario_dir.exists():
                 continue
+            scenario = SCENARIOS[scenario_id]
             score_path = scenario_dir / "judge" / "score.json"
             scores = json.loads(score_path.read_text()) if score_path.exists() else {}
-            for route in INCREMENTAL_ROUTE_IDS:
+            for route in scenario.allowed_routes:
                 metrics_path = scenario_dir / route / "metrics.json"
                 if not metrics_path.exists():
                     continue
                 metrics = json.loads(metrics_path.read_text())
                 notes = ", ".join(scores.get(route, {}).get("notes", [])) or "-"
                 lines.append(
-                    "| {scenario} | {route} | {status} | {refresh} | {fanout} | {notes} |".format(
+                    "| {scenario} | {route} | {score} | {first_tool} | {first_hit} | {refresh} | {fanout} | {notes} |".format(
                         scenario=scenario_id,
                         route=route_display_name(route),
-                        status=metrics.get("status", "-"),
+                        score=scores.get(route, {}).get("score_0_to_5", "-"),
+                        first_tool=metrics.get("first_tool_name") or "-",
+                        first_hit=metrics.get("time_to_first_hit_ms", "-"),
                         refresh=metrics.get("refresh_after_edit_ms", "-"),
                         fanout=metrics.get("file_fanout", "-"),
+                        notes=notes,
+                    )
+                )
+
+    if any((output_dir / f"scenario_{scenario_id}").exists() for scenario_id in CROSS_LANGUAGE_SCENARIO_IDS):
+        lines.extend(
+            [
+                "",
+                "## Wave 4 Cross-Language Sanity",
+                "",
+                "| Repo | Language | Scenario | Route | Score | First hit ms | Duration ms | File fan-out | Raw source chars | MCP payload chars | Notes |",
+                "|---|---|---|---|---:|---:|---:|---:|---:|---:|---|",
+            ]
+        )
+        for scenario_id in CROSS_LANGUAGE_SCENARIO_IDS:
+            scenario_dir = output_dir / f"scenario_{scenario_id}"
+            if not scenario_dir.exists():
+                continue
+            scenario = SCENARIOS[scenario_id]
+            score_path = scenario_dir / "judge" / "score.json"
+            scores = json.loads(score_path.read_text()) if score_path.exists() else {}
+            for route in scenario.allowed_routes:
+                metrics_path = scenario_dir / route / "metrics.json"
+                if not metrics_path.exists():
+                    continue
+                metrics = json.loads(metrics_path.read_text())
+                notes = ", ".join(scores.get(route, {}).get("notes", [])) or "-"
+                lines.append(
+                    "| {repo} | {language} | {scenario} | {route} | {score} | {first_hit} | {duration} | {fanout} | {raw_chars} | {mcp_chars} | {notes} |".format(
+                        repo=scenario.repo_name or "-",
+                        language=scenario.language or "-",
+                        scenario=scenario_id,
+                        route=route_display_name(route),
+                        score=scores.get(route, {}).get("score_0_to_5", "-"),
+                        first_hit=metrics.get("time_to_first_hit_ms", "-"),
+                        duration=metrics.get("duration_ms", "-"),
+                        fanout=metrics.get("file_fanout", "-"),
+                        raw_chars=metrics.get("raw_source_chars", "-"),
+                        mcp_chars=metrics.get("mcp_payload_chars", "-"),
                         notes=notes,
                     )
                 )
@@ -1238,7 +1506,17 @@ def run_benchmark(args: argparse.Namespace) -> None:
     write_json(args.output_dir / "metadata.json", metadata)
 
     if not args.skip_prewarm:
-        ensure_quickdep_scan(args.quickdep_bin, args.repo)
+        prewarmed_repos: set[str] = set()
+        for scenario in scenarios:
+            applicable_routes = [route for route in routes if route in scenario.allowed_routes]
+            if scenario.sid == "s6" or not any(route != "claude-native-only" for route in applicable_routes):
+                continue
+            repo_path = resolve_scenario_repo_path(scenario, args.repo).resolve()
+            repo_key = str(repo_path)
+            if repo_key in prewarmed_repos:
+                continue
+            ensure_quickdep_scan(args.quickdep_bin, repo_path)
+            prewarmed_repos.add(repo_key)
 
     for scenario in scenarios:
         run_scenario(
