@@ -751,6 +751,10 @@ def write_text(path: pathlib.Path, content: str) -> None:
     path.write_text(content)
 
 
+def report_cell(value: Any) -> str:
+    return "-" if value is None else str(value)
+
+
 def scenario_repo_path(
     scenario: Scenario,
     base_repo: pathlib.Path,
@@ -1370,9 +1374,9 @@ def generate_report(output_dir: pathlib.Path, markdown_path: pathlib.Path) -> pa
                         route=route_display_name(route),
                         score=scores.get(route, {}).get("score_0_to_5", "-"),
                         first_tool=metrics.get("first_tool_name") or "-",
-                        first_hit=metrics.get("time_to_first_hit_ms", "-"),
-                        refresh=metrics.get("refresh_after_edit_ms", "-"),
-                        fanout=metrics.get("file_fanout", "-"),
+                        first_hit=report_cell(metrics.get("time_to_first_hit_ms")),
+                        refresh=report_cell(metrics.get("refresh_after_edit_ms")),
+                        fanout=report_cell(metrics.get("file_fanout")),
                         notes=notes,
                     )
                 )
@@ -1407,11 +1411,11 @@ def generate_report(output_dir: pathlib.Path, markdown_path: pathlib.Path) -> pa
                         scenario=scenario_id,
                         route=route_display_name(route),
                         score=scores.get(route, {}).get("score_0_to_5", "-"),
-                        first_hit=metrics.get("time_to_first_hit_ms", "-"),
-                        duration=metrics.get("duration_ms", "-"),
-                        fanout=metrics.get("file_fanout", "-"),
-                        raw_chars=metrics.get("raw_source_chars", "-"),
-                        mcp_chars=metrics.get("mcp_payload_chars", "-"),
+                        first_hit=report_cell(metrics.get("time_to_first_hit_ms")),
+                        duration=report_cell(metrics.get("duration_ms")),
+                        fanout=report_cell(metrics.get("file_fanout")),
+                        raw_chars=report_cell(metrics.get("raw_source_chars")),
+                        mcp_chars=report_cell(metrics.get("mcp_payload_chars")),
                         notes=notes,
                     )
                 )
