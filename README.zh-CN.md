@@ -4,7 +4,7 @@
 
 # QuickDep
 
-> 帮助 Agent 更快收敛到正确代码区域的本地依赖智能层。
+> 让 Agent 在大仓库里先缩小范围，再读源码。
 
 ![许可证: MIT](https://img.shields.io/badge/License-MIT-0f766e.svg)
 ![Rust 1.75+](https://img.shields.io/badge/Rust-1.75%2B-d97706.svg)
@@ -55,39 +55,22 @@ QuickDep 的价值就是先把仓库变成一层结构化收敛层，再让 Agen
 
 如果你希望 LLM 先回答“我应该先看哪几处代码”，而不是在一大堆 grep 结果里盲猜，QuickDep 就是中间那一层。
 
-## 这轮实验真正支持什么结论
+## Claude 实验重跑结果
 
-我们在 `ark-runtime` 上做了一轮更贴近真实工作流的 Agent 对比实验，分成三条路线：
+我们已经围绕 Claude 的真实使用方式完成了这一轮 4 波重跑：
 
-- `Q`: QuickDep-first
-- `N`: Native-only
-- `H`: Hybrid（先用 QuickDep 收敛，再少量读源码）
+1. 先验证 Claude 会不会选对 QuickDep 的高层入口
+2. 再在 `ark-runtime` 上做 4 个核心场景 benchmark
+3. 再验证无锚点、编辑器上下文、增量更新这类真实开发流问题
+4. 再在 `tokio`、`nest`、`gin`、`requests`、`fmt` 上补一轮跨语言 sanity
 
-对共同场景 `S1-S5`，当前数据更支持下面这个故事：
+当前实验入口见：
 
-- `Hybrid` 平均首次命中 gold 文件或符号只要 `9.2s`
-- `Native-only` 平均需要 `16.9s`
-- `Hybrid` 平均 `file fan-out` 从 `35.8` 降到 `7.6`
-- `Hybrid` 平均原始源码读取量从约 `42.1k chars` 降到 `22.7k chars`
+- [docs/EXPERIMENT_PLAN.md](docs/EXPERIMENT_PLAN.md)
+- [docs/EXPERIMENT_RUNBOOK.md](docs/EXPERIMENT_RUNBOOK.md)
+- [docs/EXPERIMENT_REPORT.md](docs/EXPERIMENT_REPORT.md)
 
-这说明 QuickDep 已经能稳定帮助 Agent：
-
-- 更快进入正确代码区域
-- 少看很多无关文件
-- 少做大范围 grep 后的人肉筛选
-
-这轮实验**暂时还不支持**的说法：
-
-- “QuickDep-only 已经稳定更省总 token”
-- “只靠依赖图就能回答所有复杂语义问题”
-
-所以更准确的定位应该是：
-
-> QuickDep 当前最强的价值，是帮助 Agent 在大型项目里更快定位问题；token 节省是附带收益，不是第一承诺。
-
-详细实验记录见：
-
-- [docs/AGENT_HYBRID_BENCHMARK_REPORT.md](docs/AGENT_HYBRID_BENCHMARK_REPORT.md)
+新的对外结论只从这 3 份文档里产出，不再引用旧实验体系。
 
 ## 适用场景
 
@@ -117,15 +100,15 @@ QuickDep 当前已经接入到本地图谱流水线的语言如下：
 | C | `c`, `h` |
 | C++ | `cc`, `cpp`, `cxx`, `hh`, `hpp`, `hxx` |
 
-## 当前最推荐的使用方式
+## 当前操作建议
 
-现阶段最推荐的是 **Hybrid 工作流**：
+基于当前已经写入报告的 Claude 重跑结果，更准确的操作建议是：
 
-1. 先用 QuickDep 把范围缩到正确的 3 到 10 个文件 / 符号 / 调用链
-2. 再让 Agent 去读少量关键实现
-3. 把原生搜索和源码阅读留给真正需要行为细节确认的地方
+1. 对跨文件 workflow、影响分析、调用链、无锚点排查、编辑器上下文问题，优先让 QuickDep 先做结构化收敛
+2. 行为细节仍然要配合少量原生读码确认
+3. 对“理解某一个局部函数 / 方法边界”这类问题，原生工具今天依然可能更直接；QuickDep 在这类场景里的主要价值是减少盲读源码，而不是已经全面胜出
 
-这比把 QuickDep 描述成“替代所有源码阅读”的工具更真实，也更符合当前版本的实际效果。
+这才是当前数据真正支撑的结论。本轮实验并不支持“QuickDep 已经让所有问题都更快、更好”这种更强说法。
 
 ## QuickDep 和常见方案的区别
 
@@ -138,20 +121,38 @@ QuickDep 当前已经接入到本地图谱流水线的语言如下：
 
 QuickDep 的定位不是替代所有代码工具，而是给本地 MCP Agent 补上一层依赖图和调用链收敛能力。
 
-## 快速安装
+## 安装与接入
 
-面向发布版本的推荐安装方式：
+截至 `2026-04-24`，当前实测有效的安装路径是“源码安装 + `install-mcp` 接入客户端”。公开分发渠道已经准备好，但还没有真正发布上线。
+
+| 方式 | 当前状态 | 我们的验证结果 |
+| --- | --- | --- |
+| `cargo install --path .` | 已可用 | 已实测安装成功，`quickdep --version` 返回 `0.1.0` |
+| `quickdep install-mcp claude` | 已可用 | 已实测写入成功，`claude mcp list` 显示已连接 |
+| `quickdep install-mcp codex` | 已可用 | 已实测写入成功，`codex mcp list` 可见 |
+| `quickdep install-mcp opencode` | 已可用 | 已实测写入成功，`opencode mcp list` 显示已连接 |
+| GitHub Release | 未发布 | `releases/latest/download/...` 当前返回 `404` |
+| Homebrew | 未发布 | `Formula/quickdep.rb` 当前返回 `404` |
+| npm | 未发布 | `npm view @northcipher/quickdep` 当前返回 `E404` |
+
+今天想真正装起来，直接用：
 
 ```bash
-# Homebrew
-brew install northcipher/tap/quickdep
-
-# npm 二进制包装器
-npm i -g @northcipher/quickdep
-
-# 从源码安装 / 使用仓库最新状态
 cargo install --path .
+quickdep --version
 ```
+
+然后一条命令接进 Agent：
+
+```bash
+quickdep install-mcp claude
+quickdep install-mcp codex
+quickdep install-mcp opencode
+```
+
+如果你想把安装动作直接交给 Claude Code / Codex / OpenCode，可以把这份提示词原样贴给它：
+
+- [docs/AGENT_INSTALL_PROMPT.md](docs/AGENT_INSTALL_PROMPT.md)
 
 先验证本地服务正常：
 
@@ -162,14 +163,6 @@ quickdep --http 8080 --http-only
 # 终端 2
 curl http://127.0.0.1:8080/health
 # {"status":"ok"}
-```
-
-确认没问题后，再一条命令接进 Agent 客户端：
-
-```bash
-quickdep install-mcp claude
-quickdep install-mcp codex
-quickdep install-mcp opencode
 ```
 
 更多分发和集成说明见：

@@ -52,26 +52,22 @@ QuickDep 会把项目数据存到项目目录下的 `.quickdep/` 中，并支持
 
 ## 3. 安装方式
 
-面向日常使用，推荐优先级如下：
-
-- GitHub Releases：下载对应平台的预编译二进制
-- Homebrew：
-
-```bash
-brew install northcipher/tap/quickdep
-```
-
-- npm 二进制包装器：
-
-```bash
-npm i -g @northcipher/quickdep
-```
-
-- 源码安装 / 使用仓库最新状态：
+截至 `2026-04-24`，当前已经实测有效的安装方式是源码安装：
 
 ```bash
 cargo install --path .
+quickdep --version
 ```
+
+公开分发链路已经在仓库里准备好，但当前还没有真正发布：
+
+- GitHub Releases：目标分发方式，当前仓库还没有公开 release 产物
+- Homebrew：目标命令是 `brew install northcipher/tap/quickdep`，当前公式还未公开可用
+- npm 二进制包装器：目标命令是 `npm i -g @northcipher/quickdep`，当前包还未发布
+
+如果你想让 Claude Code / Codex / OpenCode 帮你自动完成安装和接入，直接复制：
+
+- [AGENT_INSTALL_PROMPT.md](AGENT_INSTALL_PROMPT.md)
 
 如果你正在仓库根目录开发，也可以先本地编译：
 

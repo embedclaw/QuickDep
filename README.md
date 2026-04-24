@@ -4,7 +4,7 @@
 
 # QuickDep
 
-> Local-first dependency intelligence that helps agents get to the right code faster.
+> Help agents narrow the codebase first, then read the right code.
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-0f766e.svg)
 ![Rust 1.75+](https://img.shields.io/badge/Rust-1.75%2B-d97706.svg)
@@ -49,33 +49,22 @@ QuickDep precomputes the code graph once, keeps it warm as files change, and giv
 
 If you want an LLM to answer "what should I inspect first?" with something better than guesswork, this is the missing layer.
 
-## What Current Benchmarking Supports
+## Claude Benchmark Rerun
 
-We ran a realistic agent benchmark on `ark-runtime` with three routes:
+We rebuilt the Claude benchmark around real agent workflows and completed the current 4-wave rerun:
 
-- `Q`: QuickDep-first
-- `N`: Native-only
-- `H`: Hybrid (QuickDep first, then limited raw code reading)
+1. verify whether Claude picks the right QuickDep high-level entry point first
+2. run 4 core benchmark scenarios on `ark-runtime`
+3. test no-anchor, editor-context, and incremental-update developer-flow cases
+4. run a cross-language sanity round on `tokio`, `nest`, `gin`, `requests`, and `fmt`
 
-Across the shared scenarios `S1-S5`, the current data supports this story:
+The current benchmark entry points are:
 
-- `Hybrid` hit the first gold file or symbol in `9.2s` on average
-- `Native-only` needed `16.9s` on average
-- `Hybrid` reduced average file fan-out from `35.8` to `7.6`
-- `Hybrid` reduced average raw source reading from about `42.1k chars` to `22.7k chars`
+- [docs/EXPERIMENT_PLAN.md](docs/EXPERIMENT_PLAN.md)
+- [docs/EXPERIMENT_RUNBOOK.md](docs/EXPERIMENT_RUNBOOK.md)
+- [docs/EXPERIMENT_REPORT.md](docs/EXPERIMENT_REPORT.md)
 
-What the benchmark does **not** support yet:
-
-- QuickDep-only does not yet give stable total-context savings
-- On behavior-heavy questions, agents still need to read implementation details
-
-So the honest claim today is:
-
-> QuickDep already helps agents localize the right part of a large codebase faster. Token savings are a secondary benefit, not the primary promise.
-
-Detailed benchmark notes:
-
-- [docs/AGENT_HYBRID_BENCHMARK_REPORT.md](docs/AGENT_HYBRID_BENCHMARK_REPORT.md)
+All public claims should come from these 3 documents, not from the deleted benchmark set.
 
 ## Good Fit
 
@@ -105,15 +94,15 @@ QuickDep currently supports these languages in the local graph pipeline:
 | C | `c`, `h` |
 | C++ | `cc`, `cpp`, `cxx`, `hh`, `hpp`, `hxx` |
 
-## Best Current Usage Pattern
+## Current Operator Guidance
 
-Today, QuickDep works best as a **hybrid workflow**:
+The current evidence-backed guidance is more specific than "always use QuickDep first":
 
-1. Use QuickDep to narrow to the right 3-10 files, symbols, and call paths
-2. Let the agent read a much smaller amount of raw code
-3. Use implementation reading only where behavior details still matter
+1. Use QuickDep first for cross-file workflow, impact, call-chain, no-anchor triage, and editor-context questions
+2. Pair QuickDep with a small amount of native code reading when behavior details matter
+3. Treat single-symbol boundary questions differently: native tools are still competitive or better there today, while QuickDep mainly helps by reducing blind raw-code reading
 
-That is a better fit for the current product than pretending the graph alone can answer every complex semantic question.
+That is what the completed rerun currently supports. The benchmark does not support the stronger claim that QuickDep already makes every question faster or better.
 
 ## QuickDep vs Common Alternatives
 
@@ -126,20 +115,38 @@ That is a better fit for the current product than pretending the graph alone can
 
 QuickDep is built specifically for local MCP agents that need dependency and call-chain answers, not just symbol search.
 
-## Quick Install
+## Install And Connect
 
-For published releases, the intended install paths are:
+As of `2026-04-24`, the verified working path is source install plus `install-mcp`. The public release channels are prepared in the repo, but they are not published yet.
+
+| Method | Current status | Verification result |
+| --- | --- | --- |
+| `cargo install --path .` | Available | Installed successfully and `quickdep --version` returned `0.1.0` |
+| `quickdep install-mcp claude` | Available | Verified and visible in `claude mcp list` |
+| `quickdep install-mcp codex` | Available | Verified and visible in `codex mcp list` |
+| `quickdep install-mcp opencode` | Available | Verified and visible in `opencode mcp list` |
+| GitHub Release | Not published | `releases/latest/download/...` currently returns `404` |
+| Homebrew | Not published | `Formula/quickdep.rb` currently returns `404` |
+| npm | Not published | `npm view @northcipher/quickdep` currently returns `E404` |
+
+If you want a working install today:
 
 ```bash
-# Homebrew
-brew install northcipher/tap/quickdep
-
-# npm binary wrapper
-npm i -g @northcipher/quickdep
-
-# from source / latest repo state
 cargo install --path .
+quickdep --version
 ```
+
+Then wire it into your agent client:
+
+```bash
+quickdep install-mcp claude
+quickdep install-mcp codex
+quickdep install-mcp opencode
+```
+
+If you want Claude Code, Codex, or OpenCode to do the install for you, use this copy-paste prompt:
+
+- [docs/AGENT_INSTALL_PROMPT.md](docs/AGENT_INSTALL_PROMPT.md)
 
 Verify that the local service is alive:
 
@@ -150,14 +157,6 @@ quickdep --http 8080 --http-only
 # terminal 2
 curl http://127.0.0.1:8080/health
 # {"status":"ok"}
-```
-
-Then register QuickDep into your agent client:
-
-```bash
-quickdep install-mcp claude
-quickdep install-mcp codex
-quickdep install-mcp opencode
 ```
 
 More distribution and integration details:

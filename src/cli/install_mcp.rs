@@ -243,6 +243,9 @@ fn load_json5_document(path: &Path) -> anyhow::Result<Value> {
 
     let content = fs::read_to_string(path)
         .with_context(|| format!("failed to read OpenCode config {}", path.display()))?;
+    if content.trim().is_empty() {
+        return Ok(Value::Object(Map::new()));
+    }
     json5::from_str(&content)
         .with_context(|| format!("failed to parse OpenCode config {}", path.display()))
 }
@@ -283,6 +286,29 @@ mod tests {
             "#,
         )
         .unwrap();
+
+        let result = install_mcp(InstallMcpOptions {
+            client: McpClient::OpenCode,
+            name: "quickdep".to_string(),
+            quickdep_bin: Some(std::env::current_exe().unwrap()),
+            dry_run: false,
+            claude_scope: ClaudeScope::Local,
+            opencode_config: Some(config_path.clone()),
+        })
+        .unwrap();
+
+        assert_eq!(result["client"], "opencode");
+        let updated: Value =
+            serde_json::from_str(&fs::read_to_string(config_path).unwrap()).unwrap();
+        assert_eq!(updated["mcp"]["quickdep"]["type"], "local");
+        assert_eq!(updated["mcp"]["quickdep"]["command"][1], "serve");
+    }
+
+    #[test]
+    fn test_install_opencode_accepts_empty_config_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("opencode.json");
+        fs::write(&config_path, "").unwrap();
 
         let result = install_mcp(InstallMcpOptions {
             client: McpClient::OpenCode,
