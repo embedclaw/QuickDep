@@ -141,16 +141,16 @@ impl CppParser {
             "type_definition" => {
                 self.extract_type_alias(node, source, file_path, result, context.scope_prefix);
             }
-            "declaration" => {
-                if context.current_type_scope.is_none() && self.is_top_level_declaration(node) {
-                    self.extract_global_declarations(
-                        node,
-                        source,
-                        file_path,
-                        result,
-                        context.scope_prefix,
-                    );
-                }
+            "declaration"
+                if context.current_type_scope.is_none() && self.is_top_level_declaration(node) =>
+            {
+                self.extract_global_declarations(
+                    node,
+                    source,
+                    file_path,
+                    result,
+                    context.scope_prefix,
+                );
             }
             "preproc_include" => {
                 self.extract_include(node, source, file_path, result);
