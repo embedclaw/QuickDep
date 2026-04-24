@@ -55,36 +55,24 @@ QuickDep 的价值就是先把仓库变成一层结构化收敛层，再让 Agen
 
 如果你希望 LLM 先回答“我应该先看哪几处代码”，而不是在一大堆 grep 结果里盲猜，QuickDep 就是中间那一层。
 
-## 在真实项目上，它现在表现如何
+## Claude 实验正在重建
 
-我们在 `ark-runtime` 上做了共同场景 `S1-S5` 的对比实验，分别测试三条路线：
+我们已经决定把旧实验文档全部删除，重新按 Claude 的真实使用方式重做实验。
 
-- 原生 Agent 自带工具
-- 只用 QuickDep
-- QuickDep + 原生工具混合使用
+新的实验不再沿用旧表格，而是分成 4 波：
 
-核心数据如下：
+1. 先验证 Claude 会不会选对 QuickDep 的高层入口
+2. 再在 `ark-runtime` 上做 4 个核心场景 benchmark
+3. 再验证无锚点、编辑器上下文、增量更新这类真实开发流问题
+4. 最后补跨语言 sanity
 
-| 路线 | 平均得分 | 平均耗时 ms | 平均上下文 tokens | 平均涉及文件数 | 平均源码读取 chars | 平均 MCP 返回 chars |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 原生 Agent 自带工具 | `3.2` | `70,365` | `278,350` | `35.8` | `42,056` | `0` |
-| 只用 QuickDep | `3.2` | `89,825` | `379,111` | `5.0` | `8,811` | `24,700` |
-| QuickDep + 原生工具 | `3.2` | `72,045` | `272,461` | `7.6` | `22,748` | `7,781` |
+当前实验入口见：
 
-这张表最值得看的不是“谁绝对更快”，而是 Agent 在多大范围里乱翻文件：
+- [docs/EXPERIMENT_PLAN.md](docs/EXPERIMENT_PLAN.md)
+- [docs/EXPERIMENT_RUNBOOK.md](docs/EXPERIMENT_RUNBOOK.md)
+- [docs/EXPERIMENT_REPORT.md](docs/EXPERIMENT_REPORT.md)
 
-- 混合路线把平均涉及文件数从 `35.8` 压到 `7.6`
-- 混合路线把平均源码读取量从 `42,056 chars` 压到 `22,748 chars`
-- 在分数基本不退化的前提下，Agent 更少跑偏到无关区域
-
-这也是 QuickDep 当前最可信的价值：
-
-> 它不是替代源码阅读，而是让 Agent 更快找到值得读的那几处代码。
-
-完整实验记录见：
-
-- [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md)
-- [docs/AGENT_HYBRID_BENCHMARK_REPORT.md](docs/AGENT_HYBRID_BENCHMARK_REPORT.md)
+新的对外结论会只从这 3 份文档里产出，不再引用旧实验体系。
 
 ## 适用场景
 
@@ -116,7 +104,7 @@ QuickDep 当前已经接入到本地图谱流水线的语言如下：
 
 ## 当前最推荐的使用方式
 
-现阶段最推荐的是 **Hybrid 工作流**：
+现阶段最推荐的是 **QuickDep + 原生工具 工作流**：
 
 1. 先用 QuickDep 把范围缩到正确的 3 到 10 个文件 / 符号 / 调用链
 2. 再让 Agent 去读少量关键实现

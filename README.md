@@ -49,36 +49,24 @@ QuickDep precomputes the code graph once, keeps it warm as files change, and giv
 
 If you want an LLM to answer "what should I inspect first?" with something better than guesswork, this is the missing layer.
 
-## What It Looks Like On a Real Repository
+## The Claude Benchmark Is Being Rebuilt
 
-We benchmarked QuickDep on `ark-runtime` across the shared scenarios `S1-S5` using three routes:
+We have decided to delete the old benchmark documents and rerun the experiment program around Claude's real workflow.
 
-- agent built-in tools only
-- QuickDep only
-- QuickDep + built-in tools
+The new benchmark is split into 4 waves:
 
-Here is the current average:
+1. verify whether Claude picks the right QuickDep high-level entry point first
+2. run 4 core benchmark scenarios on `ark-runtime`
+3. test no-anchor, editor-context, and incremental-update developer-flow cases
+4. add a cross-language sanity round
 
-| Route | Avg score | Avg time ms | Avg context tokens | Avg files touched | Avg raw source chars | Avg MCP payload chars |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Agent built-in tools only | `3.2` | `70,365` | `278,350` | `35.8` | `42,056` | `0` |
-| QuickDep only | `3.2` | `89,825` | `379,111` | `5.0` | `8,811` | `24,700` |
-| QuickDep + built-in tools | `3.2` | `72,045` | `272,461` | `7.6` | `22,748` | `7,781` |
+The current benchmark entry points are:
 
-The most important read is not raw speed. It is search-space control:
+- [docs/EXPERIMENT_PLAN.md](docs/EXPERIMENT_PLAN.md)
+- [docs/EXPERIMENT_RUNBOOK.md](docs/EXPERIMENT_RUNBOOK.md)
+- [docs/EXPERIMENT_REPORT.md](docs/EXPERIMENT_REPORT.md)
 
-- the hybrid route cut average file fan-out from `35.8` to `7.6`
-- the hybrid route cut average raw source reading from `42,056 chars` to `22,748 chars`
-- answer quality stayed flat while the agent spent far less effort wandering through unrelated files
-
-That is the product claim the data supports today:
-
-> QuickDep helps agents get to the right part of a large codebase faster. It does not replace implementation reading.
-
-Detailed benchmark notes:
-
-- [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md)
-- [docs/AGENT_HYBRID_BENCHMARK_REPORT.md](docs/AGENT_HYBRID_BENCHMARK_REPORT.md)
+All future public claims should come from these 3 documents, not from the deleted benchmark set.
 
 ## Good Fit
 
@@ -110,7 +98,7 @@ QuickDep currently supports these languages in the local graph pipeline:
 
 ## Best Current Usage Pattern
 
-Today, QuickDep works best as a **hybrid workflow**:
+Today, QuickDep works best as a **QuickDep plus native-tools workflow**:
 
 1. Use QuickDep to narrow to the right 3-10 files, symbols, and call paths
 2. Let the agent read a much smaller amount of raw code
