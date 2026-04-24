@@ -54,23 +54,17 @@ impl CParser {
                     return;
                 }
             }
-            "struct_specifier" => {
-                if self.is_top_level_type_specifier(node) {
-                    self.extract_struct(node, source, file_path, result);
-                }
+            "struct_specifier" if self.is_top_level_type_specifier(node) => {
+                self.extract_struct(node, source, file_path, result);
             }
-            "enum_specifier" => {
-                if self.is_top_level_type_specifier(node) {
-                    self.extract_enum(node, source, file_path, result);
-                }
+            "enum_specifier" if self.is_top_level_type_specifier(node) => {
+                self.extract_enum(node, source, file_path, result);
             }
             "type_definition" => {
                 self.extract_type_alias(node, source, file_path, result);
             }
-            "declaration" => {
-                if self.is_top_level_declaration(node) {
-                    self.extract_global_declarations(node, source, file_path, result);
-                }
+            "declaration" if self.is_top_level_declaration(node) => {
+                self.extract_global_declarations(node, source, file_path, result);
             }
             "preproc_include" => {
                 self.extract_include(node, source, file_path, result);

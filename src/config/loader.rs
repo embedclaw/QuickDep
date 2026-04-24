@@ -92,10 +92,27 @@ impl ConfigLoader {
     ///
     /// ```
     /// use quickdep::config::{ConfigLoader, Settings};
-    /// use std::path::Path;
+    /// use std::{
+    ///     fs,
+    ///     path::Path,
+    ///     time::{SystemTime, UNIX_EPOCH},
+    /// };
     ///
-    /// let loader = ConfigLoader::new(Path::new("/path/to/project"));
-    /// let settings = loader.load_from_file(Path::new("quickdep.toml")).unwrap();
+    /// let stamp = SystemTime::now()
+    ///     .duration_since(UNIX_EPOCH)
+    ///     .unwrap()
+    ///     .as_nanos();
+    /// let temp_dir = std::env::temp_dir().join(format!("quickdep-doc-{stamp}"));
+    /// fs::create_dir_all(&temp_dir).unwrap();
+    ///
+    /// let config_path = temp_dir.join("quickdep.toml");
+    /// fs::write(&config_path, "[scan]\ninclude = [\"src/**\"]\n").unwrap();
+    ///
+    /// let loader = ConfigLoader::new(Path::new(&temp_dir));
+    /// let settings = loader.load_from_file(&config_path).unwrap();
+    /// assert_eq!(settings.scan.include, vec!["src/**"]);
+    ///
+    /// fs::remove_dir_all(&temp_dir).ok();
     /// ```
     pub fn load_from_file(&self, path: &Path) -> Result<Settings> {
         tracing::debug!("Loading configuration from: {}", path.display());
