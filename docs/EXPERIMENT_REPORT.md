@@ -1,6 +1,6 @@
 # QuickDep Claude 实验报告
 
-> 状态：进行中
+> 状态：本轮已完成
 > 最近更新：2026-04-24
 > 说明：本报告只写入本轮实际重跑结果，不继承旧实验数字。
 
@@ -20,7 +20,8 @@
 - Claude 并发上限：`3`
 - 第一波入口选择：`claude-default`
 - 第二波核心 benchmark：`claude-native-only`、`claude-quickdep-first`、`claude-quickdep-plus-native-tools`
-- 第三波已执行子项：`s6 Incremental Watcher Refresh`
+- 第三波真实开发流：`s6 Incremental Watcher Refresh`、`s7 No-Anchor Workflow Triage`、`s8 Editor Context Risk Triage`
+- 第四波跨语言 sanity：`tokio`、`nest`、`gin`、`requests`、`fmt`
 - 本轮原始产物保存在执行机本地 `/tmp/quickdep-experiments/`，不提交到仓库
 
 ## 3. 当前状态
@@ -29,8 +30,8 @@
 | --- | --- | --- |
 | 第一波入口选择实验 | `Completed` | 4 个场景全部跑完 |
 | 第二波核心 benchmark | `Completed` | `ark-runtime` 4 个核心场景全部跑完 |
-| 第三波真实开发流专项 | `Partial` | 只完成了增量更新专项，另外 2 个场景待跑 |
-| 第四波跨语言 sanity | `Pending` | 尚未开始 |
+| 第三波真实开发流专项 | `Completed` | 无锚点、编辑器上下文、增量更新 3 个场景全部跑完 |
+| 第四波跨语言 sanity | `Completed` | `tokio`、`nest`、`gin`、`requests`、`fmt` 5 个仓库全部跑完 |
 
 ## 4. 第一波入口选择实验
 
@@ -110,13 +111,21 @@
 
 ### 无锚点问题
 
-- 状态：`Pending`
-- 结果：尚未开始
+问题：审批已经点过通过了，但这个 execution 还是没跑起来，一直卡在排队。先别全仓库乱搜，告诉我最应该先看的链路和关键位置。
+
+| 路线 | 状态 | 第一跳 | 首次命中时间 ms | 总耗时 ms | 触达文件数 | 源码读取字符数 | QuickDep 返回字符数 | 总上下文 token | 最终评分 | 备注 |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Claude 默认行为 | `Completed` | `mcp__quickdep__analyze_workflow_context` | 16207.46 | 133913 | 6 | 17515 | 14217 | 363554 | 4 | Claude 主动选中了正确的 workflow 入口 |
+| Claude QuickDep Plus Native Tools | `Completed` | `mcp__quickdep__analyze_behavior_context` | 24410.03 | 96187 | 12 | 18289 | 12427 | 414429 | 3 | 入口偏到了 behavior，漏掉审批恢复主链路 |
 
 ### 编辑器上下文问题
 
-- 状态：`Pending`
-- 结果：尚未开始
+问题：基于当前编辑器上下文，如果我要改 `RuntimeCore::next_conflict_queue_head`，最应该先看的局部点和回归风险是什么。
+
+| 路线 | 状态 | 第一跳 | 首次命中时间 ms | 总耗时 ms | 触达文件数 | 源码读取字符数 | QuickDep 返回字符数 | 总上下文 token | 最终评分 | 备注 |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Claude 默认行为 | `Completed` | `mcp__quickdep__analyze_change_impact` | 6588.39 | 106645 | 4 | 28814 | 1746 | 268207 | 4 | 入口正确，风险面覆盖可用 |
+| Claude QuickDep Plus Native Tools | `Completed` | `mcp__quickdep__analyze_change_impact` | 5477.61 | 73172 | 3 | 11810 | 1228 | 205084 | 4 | 同样正确，而且更快也更收敛 |
 
 ### 增量更新问题
 
@@ -130,36 +139,59 @@
 
 ### 第三波结论
 
-- QuickDep watcher / 增量更新在本轮实验中可用
-- 但正式口径必须写成“脚本测得刷新延迟约 `13.9s` 到 `19.7s`”，不能写成“近乎即时”
-- 这一轮只证明了增量更新专项可用，还没有覆盖无锚点问题和编辑器上下文问题
+- Claude 默认行为已经能在无锚点 workflow 问题上主动选中 `analyze_workflow_context`，说明自然语言问题路由开始具备实用性
+- 但 `Claude QuickDep Plus Native Tools` 在 `s7` 仍然会把“审批后还在排队”误判成 behavior 问题，这说明 prompt 和路由提示还不够稳
+- 编辑器上下文场景是本轮最健康的真实开发流案例：两条路线都走对入口，`QuickDep Plus Native Tools` 还把首次命中时间压到 `5.48s`、触达文件数压到 `3`
+- QuickDep watcher / 增量更新在本轮实验中可用，但正式口径必须写成“脚本测得刷新延迟约 `13.9s` 到 `19.7s`”，不能写成“近乎即时”
 
 ## 7. 第四波跨语言 sanity
 
-| 仓库 | 语言 | 路线 | 状态 | 结果摘要 |
-| --- | --- | --- | --- | --- |
-| `tokio` | Rust | Claude QuickDep Plus Native Tools | `Pending` | 尚未开始 |
-| `nest` | TypeScript | Claude QuickDep Plus Native Tools | `Pending` | 尚未开始 |
-| `gin` | Go | Claude QuickDep Plus Native Tools | `Pending` | 尚未开始 |
-| `requests` | Python | Claude QuickDep Plus Native Tools | `Pending` | 尚未开始 |
-| `fmt` 或 `redis` | C 或 C++ | Claude QuickDep Plus Native Tools | `Pending` | 尚未开始 |
+这波只测“局部边界问题”而不是跨模块工作流问题，所以结论只能覆盖“理解一个局部主流程时，QuickDep 和原生工具各自表现如何”。
+
+| 仓库 | 语言 | 路线 | 状态 | 首次命中时间 ms | 总耗时 ms | 触达文件数 | 源码读取字符数 | QuickDep 返回字符数 | 最终评分 | 备注 |
+| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `tokio` | Rust | Claude QuickDep Plus Native Tools | `Completed` | 8214.40 | 78041 | 9 | 8451 | 9135 | 3 | 降低了源码读取，但边界包仍偏宽 |
+| `tokio` | Rust | Claude 原生工具 Only | `Completed` | 6520.21 | 61761 | 40 | 103778 | 0 | 3 | 更快，但文件扩散很大 |
+| `nest` | TypeScript | Claude QuickDep Plus Native Tools | `Completed` | 6995.77 | 66883 | 17 | 4849 | 22198 | 3 | 第一跳用了 `scan_project`，包面过宽 |
+| `nest` | TypeScript | Claude 原生工具 Only | `Completed` | 6464.27 | 58467 | 5 | 53978 | 0 | 4 | 质量更高，定位更直接 |
+| `gin` | Go | Claude QuickDep Plus Native Tools | `Completed` | 9596.12 | 63053 | 12 | 6357 | 26338 | 3 | 符号覆盖高，但文件面偏大 |
+| `gin` | Go | Claude 原生工具 Only | `Completed` | 7006.71 | 65102 | 3 | 3601 | 0 | 4 | 关键局部点更集中 |
+| `requests` | Python | Claude QuickDep Plus Native Tools | `Completed` | 12336.24 | 61700 | 9 | 8855 | 40072 | 3 | 读码更少，但收敛还不够紧 |
+| `requests` | Python | Claude 原生工具 Only | `Completed` | 11966.21 | 75455 | 2 | 11711 | 0 | 4 | 质量更高，但仍要靠原生读码 |
+| `fmt` | C++ | Claude QuickDep Plus Native Tools | `Completed` | 10439.79 | 55336 | 6 | 10336 | 3266 | 3 | 头文件和实现文件都能命中，但仍偏宽 |
+| `fmt` | C++ | Claude 原生工具 Only | `Completed` | 5999.08 | 49099 | 11 | 4532 | 0 | 3 | 更快，但没有更完整 |
+
+### 第四波汇总
+
+| 路线 | 5 个场景得分 | 平均得分 | 平均总耗时 ms | 平均触达文件数 | 平均源码读取字符数 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Claude QuickDep Plus Native Tools | `3, 3, 3, 3, 3` | 3.00 | 65002.60 | 10.60 | 7769.60 |
+| Claude 原生工具 Only | `3, 4, 4, 4, 3` | 3.60 | 61976.80 | 12.20 | 35520.00 |
+
+### 第四波结论
+
+- 第四波证明了 QuickDep 的跨语言链路是通的：5 个不同语言仓库都能正常扫描、提问、返回可用答案
+- 但这波数据**不支持**“QuickDep 在跨语言局部边界问题上已经优于原生工具”的结论；当前 `Claude 原生工具 Only` 平均分是 `3.6`，高于 `QuickDep Plus Native Tools` 的 `3.0`
+- QuickDep 仍然有明确价值：它把平均源码读取字符数从 `35520` 压到了 `7769.6`，显著减少了盲读源码的量
+- 当前最大问题不是“不能跨语言”，而是“局部边界包太宽”，导致 QuickDep 路线虽然少读源码，却经常把候选文件铺得太开，甚至让质量不如原生路线
+- 因为这波只覆盖局部边界问题，不能反推到所有跨语言场景；跨模块工作流和影响分析还需要单独设计第二轮跨语言实验
 
 ## 8. 当前结论
 
-- 本轮数据已经支持一个更准确的故事：QuickDep 的主要价值是帮助 Claude 更快缩小到正确代码区域，而不是保证每个问题都更快
-- 在 `s1` 和 `s3` 这类需要跨文件找工作流或调用链的问题里，QuickDep 明显减少了文件扩散
-- 在 `s5` 这类重构前风险分析问题里，`Claude QuickDep First` 当前效果最好
-- 在 `s2` 这类局部失败传播问题里，原生路线更快，但 QuickDep 路线答案更完整
-- 当前最明确的产品问题是入口路由，尤其是 `Locate` 场景
-- 当前最明确的工程能力亮点是增量更新，它已经能在真实改动后反映新符号和新依赖
+- 本轮数据支持的主故事不是“QuickDep 让所有问题都更快”，而是“QuickDep 更适合做结构化收敛层，帮助 Agent 先缩到正确代码区域”
+- 在 `ark-runtime` 的跨文件 workflow、调用链、风险分析问题里，QuickDep 明显减少了文件扩散；`Claude QuickDep First` 平均分最高，`Claude QuickDep Plus Native Tools` 平均触达文件数最低
+- 在真实开发流里，QuickDep 已经能支撑无锚点问题、编辑器上下文问题和增量更新，但路由还不够稳，尤其是 `s7` 暴露了 workflow/behavior 入口还会混淆
+- 在跨语言局部边界问题里，QuickDep 已经证明“能用”，但还没证明“更好用”；当前它更像一个减少盲读源码的辅助手段，而不是原生搜索的普适替代
+- 当前最明确的产品问题有两个：`Locate`/workflow 类入口路由稳定性不够，以及跨语言边界包过宽
+- 当前最明确的工程能力亮点仍然是增量更新，它已经能在真实改动后反映新符号和新依赖
 
 ## 9. 下一步
 
-1. 继续补完第三波剩余两个场景：无锚点问题、编辑器上下文问题
-2. 进入第四波跨语言 sanity，确认 Rust 之外的多语言表现
-3. 修正 `Locate` 场景的入口路由，让 Claude 更稳定地选择 `locate_relevant_code`
-4. 优化 `s1` 工作流包和 `s5` 风险包，让关键符号覆盖更完整
-5. 控制 `s2` 和 `s5` 中 QuickDep 路线的额外展开，降低无效上下文
+1. 修正 `Locate` 和无锚点 workflow 场景的入口路由，让 Claude 更稳定地区分 `workflow`、`behavior`、`locate`
+2. 把跨语言“局部边界包”收紧到更少的候选文件和候选符号，优先解决 `nest`、`gin`、`requests` 里包面过宽的问题
+3. 避免在已索引项目上把 `scan_project` 当成第一跳，降低无效 MCP 步骤
+4. 为跨语言第二轮实验补充“跨模块工作流 / 影响分析”场景，验证 QuickDep 真正擅长的问题类型在非 Rust 仓库里的表现
+5. 继续优化 `s1` 工作流包和 `s5` 风险包，让关键符号覆盖更完整，同时压低额外上下文
 
 ## 10. 不允许写入这份报告的内容
 

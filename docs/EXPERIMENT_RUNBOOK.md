@@ -82,7 +82,9 @@ python3 scripts/agent_benchmark.py run \
   --max-workers 3
 ```
 
-第三波增量更新专项：
+第三波真实开发流专项：
+
+增量更新专项：
 
 ```bash
 python3 scripts/agent_benchmark.py run \
@@ -90,6 +92,33 @@ python3 scripts/agent_benchmark.py run \
   --output-dir /tmp/quickdep-experiments/wave-3-developer-flow \
   --scenarios s6 \
   --routes claude-quickdep-first claude-quickdep-plus-native-tools \
+  --max-workers 2
+```
+
+无锚点 + 编辑器上下文专项：
+
+```bash
+python3 scripts/agent_benchmark.py run \
+  --repo /Users/luozx/work/ark-runtime \
+  --output-dir /tmp/quickdep-experiments/wave-3-developer-flow \
+  --scenarios s7 s8 \
+  --routes claude-default claude-quickdep-plus-native-tools \
+  --max-workers 2
+```
+
+第四波跨语言 sanity：
+
+说明：
+
+- `--repo` 仍然传 `ark-runtime` 作为默认本地仓库
+- 脚本会根据场景自动切换到 `/Users/luozx/work/bench-repos/` 下对应的跨语言仓库
+
+```bash
+python3 scripts/agent_benchmark.py run \
+  --repo /Users/luozx/work/ark-runtime \
+  --output-dir /tmp/quickdep-experiments/wave-4-cross-language \
+  --scenarios s9 s10 s11 s12 s13 \
+  --routes claude-quickdep-plus-native-tools claude-native-only \
   --max-workers 2
 ```
 

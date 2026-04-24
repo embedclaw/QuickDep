@@ -49,16 +49,14 @@ QuickDep precomputes the code graph once, keeps it warm as files change, and giv
 
 If you want an LLM to answer "what should I inspect first?" with something better than guesswork, this is the missing layer.
 
-## The Claude Benchmark Is Being Rebuilt
+## Claude Benchmark Rerun
 
-We have decided to delete the old benchmark documents and rerun the experiment program around Claude's real workflow.
-
-The new benchmark is split into 4 waves:
+We rebuilt the Claude benchmark around real agent workflows and completed the current 4-wave rerun:
 
 1. verify whether Claude picks the right QuickDep high-level entry point first
 2. run 4 core benchmark scenarios on `ark-runtime`
 3. test no-anchor, editor-context, and incremental-update developer-flow cases
-4. add a cross-language sanity round
+4. run a cross-language sanity round on `tokio`, `nest`, `gin`, `requests`, and `fmt`
 
 The current benchmark entry points are:
 
@@ -66,7 +64,7 @@ The current benchmark entry points are:
 - [docs/EXPERIMENT_RUNBOOK.md](docs/EXPERIMENT_RUNBOOK.md)
 - [docs/EXPERIMENT_REPORT.md](docs/EXPERIMENT_REPORT.md)
 
-All future public claims should come from these 3 documents, not from the deleted benchmark set.
+All public claims should come from these 3 documents, not from the deleted benchmark set.
 
 ## Good Fit
 
@@ -98,13 +96,13 @@ QuickDep currently supports these languages in the local graph pipeline:
 
 ## Current Operator Guidance
 
-Based on the current Claude rerun results, treat QuickDep as a **QuickDep plus native-tools workflow**:
+The current evidence-backed guidance is more specific than "always use QuickDep first":
 
-1. Use QuickDep to narrow to the right 3-10 files, symbols, and call paths
-2. Let the agent read a much smaller amount of raw code
-3. Use implementation reading only where behavior details still matter
+1. Use QuickDep first for cross-file workflow, impact, call-chain, no-anchor triage, and editor-context questions
+2. Pair QuickDep with a small amount of native code reading when behavior details matter
+3. Treat single-symbol boundary questions differently: native tools are still competitive or better there today, while QuickDep mainly helps by reducing blind raw-code reading
 
-That is the current evidence-backed operating guidance, not the final cross-language conclusion. The remaining experiment waves should still confirm or reject it.
+That is what the completed rerun currently supports. The benchmark does not support the stronger claim that QuickDep already makes every question faster or better.
 
 ## QuickDep vs Common Alternatives
 
