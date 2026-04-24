@@ -4,7 +4,7 @@
 
 # QuickDep
 
-> Local-first dependency intelligence that helps agents get to the right code faster.
+> Help agents narrow the codebase first, then read the right code.
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-0f766e.svg)
 ![Rust 1.75+](https://img.shields.io/badge/Rust-1.75%2B-d97706.svg)
@@ -49,29 +49,31 @@ QuickDep precomputes the code graph once, keeps it warm as files change, and giv
 
 If you want an LLM to answer "what should I inspect first?" with something better than guesswork, this is the missing layer.
 
-## What Current Benchmarking Supports
+## What It Looks Like On a Real Repository
 
-We ran a realistic agent benchmark on `ark-runtime` with three routes:
+We benchmarked QuickDep on `ark-runtime` across the shared scenarios `S1-S5` using three routes:
 
-- `Q`: QuickDep-first
-- `N`: Native-only
-- `H`: Hybrid (QuickDep first, then limited raw code reading)
+- agent built-in tools only
+- QuickDep only
+- QuickDep + built-in tools
 
-Across the shared scenarios `S1-S5`, the current data supports this story:
+Here is the current average:
 
-- `Hybrid` hit the first gold file or symbol in `9.2s` on average
-- `Native-only` needed `16.9s` on average
-- `Hybrid` reduced average file fan-out from `35.8` to `7.6`
-- `Hybrid` reduced average raw source reading from about `42.1k chars` to `22.7k chars`
+| Route | Avg score | Avg time ms | Avg context tokens | Avg files touched | Avg raw source chars | Avg MCP payload chars |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Agent built-in tools only | `3.2` | `70,365` | `278,350` | `35.8` | `42,056` | `0` |
+| QuickDep only | `3.2` | `89,825` | `379,111` | `5.0` | `8,811` | `24,700` |
+| QuickDep + built-in tools | `3.2` | `72,045` | `272,461` | `7.6` | `22,748` | `7,781` |
 
-What the benchmark does **not** support yet:
+The most important read is not raw speed. It is search-space control:
 
-- QuickDep-only does not yet give stable total-context savings
-- On behavior-heavy questions, agents still need to read implementation details
+- the hybrid route cut average file fan-out from `35.8` to `7.6`
+- the hybrid route cut average raw source reading from `42,056 chars` to `22,748 chars`
+- answer quality stayed flat while the agent spent far less effort wandering through unrelated files
 
-So the honest claim today is:
+That is the product claim the data supports today:
 
-> QuickDep already helps agents localize the right part of a large codebase faster. Token savings are a secondary benefit, not the primary promise.
+> QuickDep helps agents get to the right part of a large codebase faster. It does not replace implementation reading.
 
 Detailed benchmark notes:
 
@@ -126,20 +128,38 @@ That is a better fit for the current product than pretending the graph alone can
 
 QuickDep is built specifically for local MCP agents that need dependency and call-chain answers, not just symbol search.
 
-## Quick Install
+## Install And Connect
 
-For published releases, the intended install paths are:
+As of `2026-04-24`, the verified working path is source install plus `install-mcp`. The public release channels are prepared in the repo, but they are not published yet.
+
+| Method | Current status | Verification result |
+| --- | --- | --- |
+| `cargo install --path .` | Available | Installed successfully and `quickdep --version` returned `0.1.0` |
+| `quickdep install-mcp claude` | Available | Verified and visible in `claude mcp list` |
+| `quickdep install-mcp codex` | Available | Verified and visible in `codex mcp list` |
+| `quickdep install-mcp opencode` | Available | Verified and visible in `opencode mcp list` |
+| GitHub Release | Not published | `releases/latest/download/...` currently returns `404` |
+| Homebrew | Not published | `Formula/quickdep.rb` currently returns `404` |
+| npm | Not published | `npm view @northcipher/quickdep` currently returns `E404` |
+
+If you want a working install today:
 
 ```bash
-# Homebrew
-brew install northcipher/tap/quickdep
-
-# npm binary wrapper
-npm i -g @northcipher/quickdep
-
-# from source / latest repo state
 cargo install --path .
+quickdep --version
 ```
+
+Then wire it into your agent client:
+
+```bash
+quickdep install-mcp claude
+quickdep install-mcp codex
+quickdep install-mcp opencode
+```
+
+If you want Claude Code, Codex, or OpenCode to do the install for you, use this copy-paste prompt:
+
+- [docs/AGENT_INSTALL_PROMPT.md](docs/AGENT_INSTALL_PROMPT.md)
 
 Verify that the local service is alive:
 
@@ -150,14 +170,6 @@ quickdep --http 8080 --http-only
 # terminal 2
 curl http://127.0.0.1:8080/health
 # {"status":"ok"}
-```
-
-Then register QuickDep into your agent client:
-
-```bash
-quickdep install-mcp claude
-quickdep install-mcp codex
-quickdep install-mcp opencode
 ```
 
 More distribution and integration details:

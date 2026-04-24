@@ -24,13 +24,19 @@ quickdep serve
 
 ## 2. 安装 QuickDep
 
-优先推荐预编译二进制：
+截至 `2026-04-24`，当前实际验证结果如下：
 
-- GitHub Releases
-- Homebrew
-- npm 包装器
+| 路径 | 状态 | 验证方式 |
+| --- | --- | --- |
+| `cargo install --path .` | 已验证可用 | 实测安装成功，`quickdep --version` 返回 `0.1.0` |
+| `quickdep install-mcp claude` | 已验证可用 | `claude mcp list` 显示 QuickDep 已连接 |
+| `quickdep install-mcp codex` | 已验证可用 | `codex mcp list` 可见 QuickDep |
+| `quickdep install-mcp opencode` | 已验证可用 | `opencode mcp list` 显示 QuickDep 已连接 |
+| GitHub Releases | 尚未发布 | 最新下载地址当前返回 `404` |
+| Homebrew | 尚未发布 | `Formula/quickdep.rb` 当前返回 `404` |
+| npm 包装器 | 尚未发布 | `npm view @northcipher/quickdep` 当前返回 `E404` |
 
-开发环境也可以直接用：
+所以今天如果要真正装起来，应该直接用源码安装：
 
 ```bash
 cargo install --path .
@@ -177,6 +183,8 @@ Use the `quickdep` MCP server for symbol lookup, dependency tracing, and cross-f
 
 ### 6.1 GitHub Releases
 
+发布工作流已经配置好；在仓库打 `v*` tag 后，会构建以下产物并准备上传。当前仓库还没有公开 release，所以这些 URL 还不能直接下载。
+
 Release 产物统一命名：
 
 - `quickdep-darwin-aarch64.tar.gz`
@@ -186,27 +194,27 @@ Release 产物统一命名：
 - `quickdep-windows-x86_64.zip`
 - `checksums.txt`
 
-这些产物由 GitHub Actions 自动构建并上传。
+这些产物会由 [`.github/workflows/release.yml`](../.github/workflows/release.yml) 在发布时自动构建并上传。
 
 ### 6.2 Homebrew
 
-Homebrew 推荐使用独立 tap，例如：
+Homebrew 计划使用独立 tap，例如：
 
 ```bash
 brew install northcipher/tap/quickdep
 ```
 
-公式应直接引用 GitHub Release 产物和 SHA256。
+公式脚本已经准备好，但 tap / formula 当前还没有公开发布。发布后，公式会直接引用 GitHub Release 产物和 SHA256。
 
 ### 6.3 npm
 
-npm 只作为二进制包装器：
+npm 只作为二进制包装器，目标命令如下：
 
 ```bash
 npm i -g @northcipher/quickdep
 ```
 
-安装脚本会根据平台下载对应的 GitHub Release 产物，并把 `quickdep` 放到包内 `bin` 目录下。
+包装脚本已经在仓库中准备好，但 npm registry 当前还没有公开发布。发布后，安装脚本会根据平台下载对应的 GitHub Release 产物，并把 `quickdep` 放到包内 `bin` 目录下。
 
 ---
 
