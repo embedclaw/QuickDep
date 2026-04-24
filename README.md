@@ -98,13 +98,13 @@ QuickDep currently supports these languages in the local graph pipeline:
 
 ## Current Operator Guidance
 
-Until the rebuilt Claude benchmark is rerun, treat QuickDep as a **QuickDep plus native-tools workflow**:
+Based on the current Claude rerun results, treat QuickDep as a **QuickDep plus native-tools workflow**:
 
 1. Use QuickDep to narrow to the right 3-10 files, symbols, and call paths
 2. Let the agent read a much smaller amount of raw code
 3. Use implementation reading only where behavior details still matter
 
-That is current product guidance, not a published benchmark conclusion. The rebuilt experiment report should confirm or reject it.
+That is the current evidence-backed operating guidance, not the final cross-language conclusion. The remaining experiment waves should still confirm or reject it.
 
 ## QuickDep vs Common Alternatives
 
