@@ -51,10 +51,6 @@ export type ProjectsResponse = {
   projects: ProjectRecord[];
 };
 
-export type ProjectStatusResponse = {
-  project: ProjectRecord;
-};
-
 export type ScanProjectResponse = {
   project: ProjectRecord;
   rebuild: boolean;
@@ -109,45 +105,49 @@ export type DependenciesResponse = {
   incoming?: DependencyNode[];
 };
 
-export type CallChainResponse = {
-  from: SymbolRecord;
-  to: SymbolRecord;
-  max_depth: number;
-  path: SymbolRecord[];
-};
-
 export type FileInterfacesResponse = {
   file_path: string;
   interfaces: SymbolRecord[];
 };
 
-export type BatchQueryKind =
-  | "find_interfaces"
-  | "get_interface"
-  | "get_dependencies"
-  | "get_call_chain"
-  | "get_file_interfaces";
-
-export type BatchQueryItem = {
-  kind: BatchQueryKind;
-  query?: string;
-  interface?: string;
-  file_path?: string;
-  from_interface?: string;
-  to_interface?: string;
-  direction?: DependencyDirection;
-  limit?: number;
-  max_depth?: number;
+export type ProjectOverviewNode = {
+  id: string;
+  name: string;
+  qualified_name: string;
+  kind: string;
+  file_path: string;
+  line: number;
+  column: number;
+  visibility: string;
+  source: string;
+  incoming_count: number;
+  outgoing_count: number;
+  degree: number;
 };
 
-export type BatchQueryResponse = {
-  results: Array<{
-    index: number;
-    kind: BatchQueryKind;
-    ok: boolean;
-    result?: unknown;
-    error?: string;
-  }>;
+export type ProjectOverviewEdge = {
+  id: string;
+  source: string;
+  target: string;
+  weight: number;
+  kinds: string[];
+};
+
+export type ProjectOverviewPayload = {
+  total_symbols: number;
+  total_edges: number;
+  displayed_symbols: number;
+  displayed_edges: number;
+  hidden_symbols: number;
+  max_symbols: number;
+  max_edges: number;
+  nodes: ProjectOverviewNode[];
+  edges: ProjectOverviewEdge[];
+};
+
+export type ProjectOverviewResponse = {
+  project: ProjectRecord;
+  overview: ProjectOverviewPayload;
 };
 
 export type HealthResponse = {
@@ -165,7 +165,9 @@ export type ErrorResponse = {
 export type ProjectStatusSocketMessage =
   | {
       type: "status";
-      data: ProjectStatusResponse;
+      data: {
+        project: ProjectRecord;
+      };
     }
   | {
       type: "error";

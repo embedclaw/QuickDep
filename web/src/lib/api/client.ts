@@ -1,12 +1,10 @@
 import type {
-  BatchQueryItem,
-  BatchQueryResponse,
-  CallChainResponse,
   DependenciesResponse,
   ErrorResponse,
   FileInterfacesResponse,
   HealthResponse,
   InterfaceDetailResponse,
+  ProjectOverviewResponse,
   ProjectRecord,
   ProjectsResponse,
   ProjectTarget,
@@ -169,21 +167,6 @@ export const quickdepApi = {
     });
   },
 
-  getCallChain(
-    baseUrl: string,
-    request: {
-      project?: ProjectTarget;
-      from_interface: string;
-      to_interface: string;
-      max_depth?: number;
-    },
-  ) {
-    return requestJson<CallChainResponse>(baseUrl, "/api/call-chain", {
-      method: "POST",
-      body: JSON.stringify(request),
-    });
-  },
-
   getFileInterfaces(
     baseUrl: string,
     request: {
@@ -201,16 +184,21 @@ export const quickdepApi = {
     );
   },
 
-  batchQuery(
+  getProjectOverview(
     baseUrl: string,
     request: {
       project?: ProjectTarget;
-      queries: BatchQueryItem[];
+      max_symbols?: number;
+      max_edges?: number;
     },
   ) {
-    return requestJson<BatchQueryResponse>(baseUrl, "/api/query/batch", {
-      method: "POST",
-      body: JSON.stringify(request),
-    });
+    return requestJson<ProjectOverviewResponse>(
+      baseUrl,
+      "/api/projects/overview",
+      {
+        method: "POST",
+        body: JSON.stringify(request),
+      },
+    );
   },
 };
