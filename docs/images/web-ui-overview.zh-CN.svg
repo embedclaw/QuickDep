@@ -1,0 +1,143 @@
+<svg width="2048" height="1092" viewBox="0 0 2048 1092" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="2048" height="1092" rx="20" fill="#F6F6F4"/>
+  <rect x="1" y="1" width="2046" height="1090" rx="19" stroke="#DADAD7"/>
+  <rect x="20" y="20" width="335" height="212" fill="#FCFCFB" stroke="#D8D8D4"/>
+  <text x="36" y="68" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#111111">QuickDep</text>
+  <rect x="208" y="40" width="128" height="38" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <rect x="208" y="40" width="64" height="38" fill="#111111"/>
+  <text x="223" y="66" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#FFFFFF">中文</text>
+  <text x="289" y="66" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#666666">EN</text>
+  <text x="36" y="106" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">后端地址</text>
+  <rect x="36" y="121" width="301" height="46" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="52" y="151" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#222222">http://127.0.0.1:8080</text>
+  <rect x="36" y="184" width="80" height="34" fill="#FFFFFF" stroke="#111111"/>
+  <rect x="128" y="184" width="120" height="34" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <rect x="268" y="184" width="69" height="34" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="49" y="207" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#111111">后端正常</text>
+  <text x="139" y="207" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#666666">实时状态未连接</text>
+  <text x="281" y="207" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#666666">实时监控</text>
+  <rect x="20" y="249" width="335" height="419" fill="#FCFCFB" stroke="#D8D8D4"/>
+  <text x="36" y="284" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#111111">项目</text>
+  <text x="36" y="316" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">扫描路径</text>
+  <rect x="36" y="330" width="301" height="44" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="55" y="359" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#888888">/path/to/project</text>
+  <rect x="36" y="389" width="98" height="43" fill="#111111"/>
+  <rect x="36" y="389" width="98" height="43" fill="#111111"/>
+  <rect x="231" y="389" width="106" height="43" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="52" y="417" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#FFFFFF">扫描 / 注册</text>
+  <text x="248" y="417" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#222222">重建索引</text>
+  <rect x="36" y="445" width="301" height="98" fill="#FFFFFF" stroke="#111111"/>
+  <text x="52" y="476" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#111111">quickdep</text>
+  <text x="52" y="501" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">/Users/luozx/work/quickdep</text>
+  <text x="52" y="527" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">已加载于 4月25日 14:44</text>
+  <rect x="36" y="555" width="301" height="96" fill="#FAFAF9" stroke="#E3E3E0"/>
+  <text x="52" y="586" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#111111">ark-runtime</text>
+  <text x="52" y="611" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">/Users/luozx/work/ark-runtime</text>
+  <text x="52" y="637" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">已加载于 4月25日 14:09</text>
+  <rect x="20" y="685" width="335" height="387" fill="#FCFCFB" stroke="#D8D8D4"/>
+  <text x="36" y="720" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#111111">搜索接口</text>
+  <text x="285" y="720" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#666666">结果 9</text>
+  <rect x="36" y="742" width="301" height="44" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="52" y="771" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#222222">claude</text>
+  <rect x="36" y="801" width="301" height="98" fill="#FFFFFF" stroke="#E1E1DE"/>
+  <text x="52" y="832" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#111111">Claude</text>
+  <text x="52" y="858" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">枚举成员</text>
+  <text x="52" y="884" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">src/main.rs</text>
+  <rect x="36" y="909" width="301" height="98" fill="#FFFFFF" stroke="#E1E1DE"/>
+  <text x="52" y="940" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#111111">Claude</text>
+  <text x="52" y="966" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">枚举成员</text>
+  <text x="52" y="992" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">src/cli/install_mcp.rs</text>
+  <rect x="36" y="1017" width="301" height="55" fill="#FFFFFF" stroke="#E1E1DE"/>
+  <text x="52" y="1048" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#111111">ClaudeScope</text>
+  <text x="52" y="1067" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">枚举</text>
+  <rect x="376" y="0" width="11" height="1092" fill="#D1D1CD"/>
+  <rect x="401" y="16" width="365" height="187" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="414" y="43" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#111111">install_mcp</text>
+  <text x="414" y="64" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">src/cli/install_mcp.rs::install_mcp</text>
+  <text x="414" y="95" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#222222">流入 6    流出 66</text>
+  <text x="414" y="126" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">类型</text>
+  <text x="414" y="150" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#111111">函数</text>
+  <text x="414" y="179" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">位置</text>
+  <text x="414" y="201" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#111111">src/cli/install_mcp.rs:64</text>
+  <rect x="1609" y="16" width="143" height="43" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="1626" y="43" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111111">返回项目云图</text>
+  <rect x="1761" y="16" width="133" height="73" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="1773" y="39" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">依赖方向</text>
+  <rect x="1771" y="48" width="113" height="31" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="1791" y="69" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#111111">双向</text>
+  <rect x="1903" y="16" width="118" height="73" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="1916" y="39" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">深度</text>
+  <rect x="1914" y="48" width="88" height="31" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="1947" y="69" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#111111">4</text>
+  <g opacity="0.82">
+    <line x1="1380" y1="585" x2="1220" y2="401" stroke="#4A4A4A" stroke-width="4" stroke-linecap="round"/>
+    <line x1="1380" y1="585" x2="1492" y2="338" stroke="#414141" stroke-width="4" stroke-linecap="round"/>
+    <line x1="1380" y1="585" x2="1590" y2="448" stroke="#4E4E4E" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="1380" y1="585" x2="1380" y2="772" stroke="#5B5B5B" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="1380" y1="585" x2="1220" y2="580" stroke="#7E7E7E" stroke-width="3" stroke-dasharray="7 8" stroke-linecap="round"/>
+    <line x1="1380" y1="585" x2="1138" y2="226" stroke="#9A9A9A" stroke-width="3" stroke-dasharray="7 8" stroke-linecap="round"/>
+    <line x1="1380" y1="585" x2="1469" y2="91" stroke="#D0D0D0" stroke-width="3" stroke-dasharray="7 8" stroke-linecap="round"/>
+    <line x1="1380" y1="585" x2="1791" y2="281" stroke="#949494" stroke-width="3" stroke-dasharray="7 8" stroke-linecap="round"/>
+    <line x1="1380" y1="585" x2="1915" y2="648" stroke="#8C8C8C" stroke-width="3" stroke-dasharray="7 8" stroke-linecap="round"/>
+    <line x1="1380" y1="585" x2="1762" y2="782" stroke="#939393" stroke-width="3" stroke-dasharray="7 8" stroke-linecap="round"/>
+    <line x1="1380" y1="585" x2="1109" y2="867" stroke="#9A9A9A" stroke-width="3" stroke-dasharray="7 8" stroke-linecap="round"/>
+    <line x1="1380" y1="585" x2="954" y2="916" stroke="#9B9B9B" stroke-width="3" stroke-dasharray="7 8" stroke-linecap="round"/>
+    <line x1="1380" y1="585" x2="920" y2="352" stroke="#8F8F8F" stroke-width="3" stroke-dasharray="7 8" stroke-linecap="round"/>
+  </g>
+  <g>
+    <circle cx="1380" cy="585" r="45" fill="#4B4B4B" stroke="#111111" stroke-width="2"/>
+    <text x="1348" y="592" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#FFFFFF">install_mcp</text>
+    <circle cx="1220" cy="401" r="40" fill="#F0F0EE" stroke="#8D8D8D" stroke-width="3"/>
+    <circle cx="1492" cy="338" r="44" fill="#F0F0EE" stroke="#C4C4C0" stroke-width="2"/>
+    <circle cx="1590" cy="448" r="44" fill="#F0F0EE" stroke="#C4C4C0" stroke-width="2"/>
+    <circle cx="1380" cy="772" r="43" fill="#F0F0EE" stroke="#C4C4C0" stroke-width="2"/>
+    <circle cx="1220" cy="580" r="39" fill="#F0F0EE" stroke="#D0D0CC" stroke-width="2"/>
+    <circle cx="1138" cy="226" r="39" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1469" cy="91" r="41" fill="#F0F0EE" stroke="#D0D0CC" stroke-width="2"/>
+    <circle cx="1670" cy="143" r="39" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1791" cy="281" r="40" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1848" cy="421" r="38" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1915" cy="648" r="40" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1762" cy="782" r="39" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1632" cy="948" r="39" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1435" cy="960" r="39" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1338" cy="1082" r="38" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1238" cy="968" r="37" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1109" cy="867" r="39" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="954" cy="916" r="37" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="867" cy="759" r="35" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="821" cy="555" r="34" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="920" cy="352" r="34" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1060" cy="548" r="38" fill="#F0F0EE" stroke="#D0D0CC" stroke-width="2"/>
+    <circle cx="1378" cy="406" r="41" fill="#F5F5F3" stroke="#DADAD6"/>
+    <circle cx="1364" cy="275" r="37" fill="#F5F5F3" stroke="#DADAD6"/>
+    <circle cx="1258" cy="328" r="40" fill="#F5F5F3" stroke="#DADAD6"/>
+    <circle cx="1525" cy="572" r="40" fill="#F5F5F3" stroke="#DADAD6"/>
+  </g>
+  <text x="1171" y="399" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" fill="#111111">src/cli/install_mcp.rs::test_install_opencode_accepts_empty_config_file</text>
+  <rect x="1383" y="416" width="297" height="86" fill="#D9D9D7" fill-opacity="0.96" stroke="#B7B7B2"/>
+  <text x="1397" y="440" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#333333">src/cli/</text>
+  <text x="1397" y="461" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#333333">install_mcp.rs::test_install_opencode_accepts_e</text>
+  <text x="1397" y="480" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#333333">mpty_config_file</text>
+  <text x="1397" y="498" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#333333">src/cli/install_mcp.rs</text>
+  <text x="1397" y="517" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#333333">调用 · 流入</text>
+  <rect x="401" y="877" width="279" height="195" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="414" y="904" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#111111">关系说明</text>
+  <line x1="414" y1="926" x2="454" y2="926" stroke="#4A4A4A" stroke-width="3" stroke-linecap="round"/>
+  <text x="460" y="932" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">实线：直接关系 / 一阶依赖</text>
+  <line x1="414" y1="950" x2="454" y2="950" stroke="#8C8C8C" stroke-width="3" stroke-dasharray="7 8" stroke-linecap="round"/>
+  <text x="460" y="956" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">虚线：更深层的间接关系</text>
+  <line x1="414" y1="975" x2="454" y2="975" stroke="#424242" stroke-width="5" stroke-linecap="round"/>
+  <text x="460" y="981" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">线越粗越深：关系越强或连接越多</text>
+  <text x="414" y="1027" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#111111">方向说明</text>
+  <line x1="414" y1="1049" x2="454" y2="1049" stroke="#3E3E3E" stroke-width="3" stroke-linecap="round"/>
+  <text x="460" y="1055" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">深色线：以当前接口为主的关联</text>
+  <line x1="414" y1="1073" x2="454" y2="1073" stroke="#B1B1B1" stroke-width="3" stroke-linecap="round"/>
+  <text x="460" y="1079" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">浅色线：从周边收敛过来的关联</text>
+  <rect x="1878" y="1036" width="32" height="38" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <rect x="1923" y="1036" width="32" height="38" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <rect x="1969" y="1036" width="63" height="38" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="1889" y="1062" font-family="Arial, Helvetica, sans-serif" font-size="24" fill="#111111">+</text>
+  <text x="1934" y="1062" font-family="Arial, Helvetica, sans-serif" font-size="24" fill="#111111">−</text>
+  <text x="1981" y="1061" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111111">还原</text>
+</svg>
