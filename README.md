@@ -22,6 +22,46 @@ Instead of making Claude, Codex, or your own tooling grep a large codebase blind
 It runs locally, persists graph data in SQLite, updates incrementally, and exposes the result through MCP, HTTP, WebSocket, and a local web UI.
 QuickDep is MIT licensed and designed for real coding workflows where agents need to find the right files before they can reason correctly.
 
+## Web UI
+
+![QuickDep Web UI](docs/images/web-ui-overview.svg)
+
+The web UI is a local visual console for people who want to inspect project state and dependency graphs directly in the browser.
+The left side is operational: backend address, project registration, project switching, and symbol search.
+The right side is visual: project-level relation cloud, symbol-level dependency graph, zoom, depth control, and direction filtering.
+
+### Start the web UI
+
+1. Start QuickDep with HTTP enabled:
+
+   ```bash
+   quickdep --http 8080 --http-only
+   ```
+
+2. Start the frontend:
+
+   ```bash
+   cd web
+   npm install
+   npm run dev
+   ```
+
+3. Open the local address printed by Vite, usually `http://127.0.0.1:5173`.
+
+### Use the web UI
+
+1. Confirm the backend field points to `http://127.0.0.1:8080`
+2. Paste a local repository path into `Scan path`, then click `Scan / Register`
+3. Pick the indexed project from `Projects`
+4. Use `Search` to find a function, method, or type
+5. Click a result to open its dependency graph
+6. Use `Direction` and `Depth` in the top-right corner to change the graph scope
+7. Click `Back to cloud` to return to the project-wide relation view
+8. Use the `+`, `-`, and `Reset` controls in the bottom-right corner to zoom and recenter
+
+The browser UI does not require editing `quickdep.toml`.
+It talks to the same local QuickDep HTTP service that MCP clients and API consumers use.
+
 ## The Question QuickDep Answers Better Than grep
 
 **"What breaks if I change `helper()`?"**

@@ -1,0 +1,137 @@
+<svg width="2048" height="1092" viewBox="0 0 2048 1092" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="2048" height="1092" rx="20" fill="#F6F6F4"/>
+  <rect x="1" y="1" width="2046" height="1090" rx="19" stroke="#DADAD7"/>
+  <rect x="20" y="20" width="335" height="215" fill="#FCFCFB" stroke="#D8D8D4"/>
+  <text x="36" y="72" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#111111">QuickDep</text>
+  <rect x="208" y="44" width="128" height="38" fill="#111111"/>
+  <rect x="208" y="44" width="64" height="38" fill="#FCFCFB" stroke="#D8D8D4"/>
+  <text x="223" y="69" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#666666">中文</text>
+  <text x="289" y="69" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#FFFFFF">EN</text>
+  <text x="36" y="114" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">Backend</text>
+  <rect x="36" y="126" width="301" height="44" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="52" y="155" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#222222">http://127.0.0.1:8080</text>
+  <rect x="36" y="187" width="101" height="34" fill="#FFFFFF" stroke="#111111"/>
+  <rect x="162" y="187" width="98" height="34" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <rect x="287" y="187" width="50" height="34" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="50" y="210" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#111111">Backend ok</text>
+  <text x="178" y="210" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#666666">Socket idle</text>
+  <text x="301" y="210" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#666666">Live</text>
+  <rect x="20" y="252" width="335" height="474" fill="#FCFCFB" stroke="#D8D8D4"/>
+  <text x="36" y="288" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#111111">Projects</text>
+  <text x="36" y="320" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">Scan path</text>
+  <rect x="36" y="334" width="301" height="44" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="54" y="362" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#888888">/path/to/project</text>
+  <rect x="36" y="394" width="168" height="43" fill="#111111"/>
+  <rect x="36" y="444" width="148" height="43" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="53" y="422" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#FFFFFF">Scan / Register</text>
+  <text x="54" y="472" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#222222">Rebuild index</text>
+  <rect x="36" y="502" width="301" height="98" fill="#FFFFFF" stroke="#111111"/>
+  <text x="52" y="532" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#111111">quickdep</text>
+  <text x="52" y="558" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">/Users/luozx/work/quickdep</text>
+  <text x="52" y="584" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">Loaded Apr 25, 02:38 PM</text>
+  <rect x="36" y="612" width="301" height="96" fill="#FAFAF9" stroke="#E3E3E0"/>
+  <text x="52" y="642" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#111111">ark-runtime</text>
+  <text x="52" y="668" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">/Users/luozx/work/ark-runtime</text>
+  <text x="52" y="694" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">Loaded Apr 25, 02:09 PM</text>
+  <rect x="20" y="743" width="335" height="329" fill="#FCFCFB" stroke="#D8D8D4"/>
+  <text x="36" y="779" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#111111">Search</text>
+  <text x="258" y="779" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#666666">Results 9</text>
+  <rect x="36" y="798" width="301" height="44" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="52" y="827" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#222222">claude</text>
+  <rect x="36" y="857" width="301" height="98" fill="#FFFFFF" stroke="#E1E1DE"/>
+  <text x="52" y="887" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#111111">Claude</text>
+  <text x="52" y="912" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">Enum Variant</text>
+  <text x="52" y="936" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">src/main.rs</text>
+  <rect x="36" y="966" width="301" height="98" fill="#FFFFFF" stroke="#E1E1DE"/>
+  <text x="52" y="996" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#111111">Claude</text>
+  <text x="52" y="1021" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">Enum Variant</text>
+  <text x="52" y="1045" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">src/cli/install_mcp.rs</text>
+  <rect x="376" y="0" width="11" height="1092" fill="#D1D1CD"/>
+  <rect x="401" y="20" width="365" height="187" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="414" y="49" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#111111">install_mcp</text>
+  <text x="414" y="70" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">src/cli/install_mcp.rs::install_mcp</text>
+  <text x="414" y="102" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#222222">Incoming 6    Outgoing 66</text>
+  <text x="414" y="142" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">Kind</text>
+  <text x="414" y="166" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#111111">Function</text>
+  <text x="414" y="196" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">Location</text>
+  <text x="414" y="218" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#111111">src/cli/install_mcp.rs:64</text>
+  <rect x="1552" y="22" width="185" height="40" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="1600" y="48" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111111">Back to cloud</text>
+  <rect x="1748" y="22" width="145" height="70" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="1760" y="44" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">Direction</text>
+  <rect x="1758" y="52" width="124" height="28" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="1772" y="72" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#111111">Both</text>
+  <rect x="1905" y="22" width="118" height="70" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="1917" y="44" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">Depth</text>
+  <rect x="1915" y="52" width="88" height="28" rx="3" fill="#FFFFFF" stroke="#111111" stroke-width="2"/>
+  <text x="1947" y="72" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#111111">4</text>
+  <g opacity="0.82">
+    <line x1="1380" y1="587" x2="1190" y2="438" stroke="#4A4A4A" stroke-width="4" stroke-linecap="round"/>
+    <line x1="1380" y1="587" x2="1494" y2="338" stroke="#414141" stroke-width="4" stroke-linecap="round"/>
+    <line x1="1380" y1="587" x2="1598" y2="444" stroke="#4E4E4E" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="1380" y1="587" x2="1380" y2="778" stroke="#5B5B5B" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="1380" y1="587" x2="1221" y2="581" stroke="#7E7E7E" stroke-width="3" stroke-dasharray="7 8" stroke-linecap="round"/>
+    <line x1="1380" y1="587" x2="1132" y2="224" stroke="#9A9A9A" stroke-width="3" stroke-dasharray="7 8" stroke-linecap="round"/>
+    <line x1="1380" y1="587" x2="1469" y2="90" stroke="#D0D0D0" stroke-width="3" stroke-dasharray="7 8" stroke-linecap="round"/>
+    <line x1="1380" y1="587" x2="1790" y2="281" stroke="#949494" stroke-width="3" stroke-dasharray="7 8" stroke-linecap="round"/>
+    <line x1="1380" y1="587" x2="1914" y2="648" stroke="#8C8C8C" stroke-width="3" stroke-dasharray="7 8" stroke-linecap="round"/>
+    <line x1="1380" y1="587" x2="1761" y2="783" stroke="#939393" stroke-width="3" stroke-dasharray="7 8" stroke-linecap="round"/>
+    <line x1="1380" y1="587" x2="1108" y2="869" stroke="#9A9A9A" stroke-width="3" stroke-dasharray="7 8" stroke-linecap="round"/>
+    <line x1="1380" y1="587" x2="952" y2="915" stroke="#9B9B9B" stroke-width="3" stroke-dasharray="7 8" stroke-linecap="round"/>
+    <line x1="1380" y1="587" x2="961" y2="354" stroke="#8F8F8F" stroke-width="3" stroke-dasharray="7 8" stroke-linecap="round"/>
+  </g>
+  <g>
+    <circle cx="1380" cy="587" r="44" fill="#4B4B4B" stroke="#111111" stroke-width="2"/>
+    <text x="1347" y="593" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#FFFFFF">install_mcp</text>
+    <circle cx="1190" cy="438" r="43" fill="#F0F0EE" stroke="#C4C4C0" stroke-width="2"/>
+    <circle cx="1494" cy="338" r="44" fill="#F0F0EE" stroke="#C4C4C0" stroke-width="2"/>
+    <circle cx="1598" cy="444" r="44" fill="#F0F0EE" stroke="#C4C4C0" stroke-width="2"/>
+    <circle cx="1380" cy="778" r="43" fill="#F0F0EE" stroke="#C4C4C0" stroke-width="2"/>
+    <circle cx="1221" cy="581" r="40" fill="#F0F0EE" stroke="#D0D0CC" stroke-width="2"/>
+    <circle cx="1132" cy="224" r="39" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1469" cy="90" r="41" fill="#F0F0EE" stroke="#D0D0CC" stroke-width="2"/>
+    <circle cx="1670" cy="149" r="39" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1790" cy="281" r="40" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1848" cy="424" r="38" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1914" cy="648" r="38" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1761" cy="783" r="39" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1632" cy="951" r="39" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1433" cy="961" r="39" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1338" cy="1080" r="38" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1238" cy="968" r="37" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1108" cy="869" r="39" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="952" cy="915" r="37" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="867" cy="759" r="36" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="821" cy="559" r="34" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="921" cy="355" r="34" fill="#F0F0EE" stroke="#C7C7C3" stroke-width="2"/>
+    <circle cx="1058" cy="550" r="38" fill="#F0F0EE" stroke="#D0D0CC" stroke-width="2"/>
+    <circle cx="1380" cy="406" r="41" fill="#F5F5F3" stroke="#DADAD6"/>
+    <circle cx="1367" cy="275" r="37" fill="#F5F5F3" stroke="#DADAD6"/>
+    <circle cx="1258" cy="334" r="39" fill="#F5F5F3" stroke="#DADAD6"/>
+    <circle cx="1522" cy="571" r="40" fill="#F5F5F3" stroke="#DADAD6"/>
+  </g>
+  <rect x="1194" y="443" width="178" height="53" fill="#F0F0EE" stroke="#BDBDB8"/>
+  <text x="1210" y="461" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#444444">&lt;external&gt;::anyhow::anyhow</text>
+  <text x="1210" y="478" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#444444">&lt;external&gt;</text>
+  <text x="1210" y="493" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#444444">Call · outgoing</text>
+  <rect x="401" y="819" width="343" height="258" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="414" y="846" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#111111">Relation guide</text>
+  <line x1="414" y1="868" x2="454" y2="868" stroke="#4A4A4A" stroke-width="3" stroke-linecap="round"/>
+  <text x="460" y="874" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">Solid line: direct or first-hop relation</text>
+  <line x1="414" y1="892" x2="454" y2="892" stroke="#8C8C8C" stroke-width="3" stroke-dasharray="7 8" stroke-linecap="round"/>
+  <text x="460" y="898" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">Dashed line: deeper indirect relation</text>
+  <line x1="414" y1="917" x2="454" y2="917" stroke="#424242" stroke-width="5" stroke-linecap="round"/>
+  <text x="460" y="923" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">Darker and thicker lines mean stronger or denser relations</text>
+  <text x="414" y="969" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#111111">Direction guide</text>
+  <line x1="414" y1="991" x2="454" y2="991" stroke="#3E3E3E" stroke-width="3" stroke-linecap="round"/>
+  <text x="460" y="997" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">Dark line: relation centered on the current symbol</text>
+  <line x1="414" y1="1034" x2="454" y2="1034" stroke="#B1B1B1" stroke-width="3" stroke-linecap="round"/>
+  <text x="460" y="1025" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">Light line: relation converging from</text>
+  <text x="460" y="1048" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666">surrounding symbols</text>
+  <rect x="1866" y="1039" width="34" height="38" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <rect x="1910" y="1039" width="34" height="38" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <rect x="1958" y="1039" width="76" height="38" fill="#FFFFFF" stroke="#D8D8D4"/>
+  <text x="1878" y="1065" font-family="Arial, Helvetica, sans-serif" font-size="24" fill="#111111">+</text>
+  <text x="1923" y="1065" font-family="Arial, Helvetica, sans-serif" font-size="24" fill="#111111">−</text>
+  <text x="1971" y="1064" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111111">Reset</text>
+</svg>
