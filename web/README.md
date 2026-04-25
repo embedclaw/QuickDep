@@ -1,15 +1,15 @@
 # QuickDep Web UI
 
-QuickDep Web UI is a local exploration console for the existing HTTP API.
+QuickDep Web UI is the browser surface for QuickDep's HTTP API. It keeps the interaction model simple: project controls on the left, dependency graph on the right.
 
-## What it does
+## Current capabilities
 
-- Lists registered projects and their live scan state
-- Triggers scan / rebuild directly from the UI
-- Searches interfaces without hand-writing JSON
-- Shows a layered dependency neighborhood graph
-- Provides raw dependency tables, file members, and call-chain lookup
-- Supports batch queries with form rows instead of manual request payloads
+- Register a repository path and trigger indexing or rebuild
+- Switch between indexed projects and watch their live status
+- Search for interfaces from the sidebar
+- Open a project-wide relation cloud
+- Drill into one interface and inspect its local dependency graph
+- Adjust graph scale, dependency direction, and depth in place
 
 ## Run it
 
@@ -27,18 +27,17 @@ QuickDep Web UI is a local exploration console for the existing HTTP API.
    npm run dev
    ```
 
-3. Open the address printed by Vite, usually `http://127.0.0.1:4173`.
+3. Open the local address printed by Vite, usually `http://127.0.0.1:5173`.
 
-## Backend address
+## Using the UI
 
-The UI defaults to `http://127.0.0.1:8080`.
+- The default backend address is `http://127.0.0.1:8080`
+- Use the left sidebar to switch language, set backend address, scan a new path, and pick a project
+- Search results and same-file interfaces also stay in the left sidebar
+- The main canvas shows either the project relation cloud or the focused interface graph
+- Graph zoom, pan, and reset controls are inside the canvas
 
-You can change it in two ways:
-
-- Enter a different backend URL in the top bar and press `Connect`
-- Create `web/.env` from `.env.example`
-
-No `quickdep.toml` editing is required just to use the UI. If you want to scan a new repository, paste its absolute path into `Scan path` and use `Scan / Register`.
+You do not need to edit `quickdep.toml` just to open the UI or scan a local repository from the browser.
 
 ## Production build
 

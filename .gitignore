@@ -36,3 +36,5 @@ tests/fixtures/**/.quickdep/
 /web/node_modules/
 /web/dist/
 /web/.vite/
+/web/mockups/
+/web/test-results/
