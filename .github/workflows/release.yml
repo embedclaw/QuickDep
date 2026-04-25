@@ -127,17 +127,21 @@ jobs:
     name: Publish npm wrapper
     runs-on: ubuntu-latest
     needs: publish-release
-    if: ${{ secrets.NPM_TOKEN != '' }}
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+        if: ${{ env.NPM_TOKEN != '' }}
 
       - name: Setup Node
+        if: ${{ env.NPM_TOKEN != '' }}
         uses: actions/setup-node@v4
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
 
       - name: Set npm package version
+        if: ${{ env.NPM_TOKEN != '' }}
         working-directory: npm/quickdep
         shell: bash
         run: |
@@ -146,25 +150,34 @@ jobs:
           npm version "$VERSION" --no-git-tag-version
 
       - name: Publish npm package
+        if: ${{ env.NPM_TOKEN != '' }}
         working-directory: npm/quickdep
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
         run: npm publish --access public
+
+      - name: Skip npm publish
+        if: ${{ env.NPM_TOKEN == '' }}
+        run: echo "NPM_TOKEN is not configured; skipping npm publish."
 
   update-homebrew-tap:
     name: Update Homebrew tap
     runs-on: ubuntu-latest
     needs: publish-release
-    if: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
+    env:
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+        if: ${{ env.HOMEBREW_TAP_TOKEN != '' }}
 
       - name: Download release assets
+        if: ${{ env.HOMEBREW_TAP_TOKEN != '' }}
         uses: actions/download-artifact@v4
         with:
           path: dist
 
       - name: Collect checksums
+        if: ${{ env.HOMEBREW_TAP_TOKEN != '' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -173,13 +186,15 @@ jobs:
           (cd release && sha256sum * > checksums.txt)
 
       - name: Checkout tap repository
+        if: ${{ env.HOMEBREW_TAP_TOKEN != '' }}
         uses: actions/checkout@v4
         with:
           repository: Northcipher/homebrew-tap
-          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          token: ${{ env.HOMEBREW_TAP_TOKEN }}
           path: tap
 
       - name: Update formula
+        if: ${{ env.HOMEBREW_TAP_TOKEN != '' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -193,6 +208,7 @@ jobs:
             --linux-x86_64-sha "$(sha256sum release/quickdep-linux-x86_64.tar.gz | awk '{print $1}')"
 
       - name: Commit formula update
+        if: ${{ env.HOMEBREW_TAP_TOKEN != '' }}
         shell: bash
         working-directory: tap
         run: |
@@ -203,3 +219,7 @@ jobs:
           git diff --cached --quiet && exit 0
           git commit -m "chore: update quickdep ${GITHUB_REF_NAME#v}"
           git push
+
+      - name: Skip Homebrew publish
+        if: ${{ env.HOMEBREW_TAP_TOKEN == '' }}
+        run: echo "HOMEBREW_TAP_TOKEN is not configured; skipping Homebrew tap update."
