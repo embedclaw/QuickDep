@@ -62,11 +62,9 @@ function resolveAsset() {
   }
 
   if (platform === "linux" && arch === "arm64") {
-    return {
-      name: "quickdep-linux-aarch64.tar.gz",
-      binaryName: "quickdep",
-      archive: "tar.gz",
-    };
+    throw new Error(
+      "QuickDep npm package does not currently ship a Linux ARM64 binary. Use Linux x86_64, macOS Apple Silicon, or Windows x86_64 assets instead."
+    );
   }
 
   if (platform === "win32" && arch === "x64") {

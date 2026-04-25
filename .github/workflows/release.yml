@@ -23,13 +23,6 @@ jobs:
             asset_name: quickdep-linux-x86_64.tar.gz
             binary_name: quickdep
             use_cross: false
-          - name: linux-aarch64
-            runner: ubuntu-latest
-            target: aarch64-unknown-linux-gnu
-            archive: tar.gz
-            asset_name: quickdep-linux-aarch64.tar.gz
-            binary_name: quickdep
-            use_cross: true
           - name: darwin-aarch64
             runner: macos-14
             target: aarch64-apple-darwin
@@ -196,7 +189,6 @@ jobs:
             --repository "Northcipher/QuickDep" \
             --tap-repo tap \
             --darwin-aarch64-sha "$(sha256sum release/quickdep-darwin-aarch64.tar.gz | awk '{print $1}')" \
-            --linux-aarch64-sha "$(sha256sum release/quickdep-linux-aarch64.tar.gz | awk '{print $1}')" \
             --linux-x86_64-sha "$(sha256sum release/quickdep-linux-x86_64.tar.gz | awk '{print $1}')"
 
       - name: Commit formula update

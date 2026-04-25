@@ -19,13 +19,8 @@ FORMULA_TEMPLATE = """class Quickdep < Formula
   end
 
   on_linux do
-    if Hardware::CPU.arm?
-      url "https://github.com/{repository}/releases/download/v{version}/quickdep-linux-aarch64.tar.gz"
-      sha256 "{linux_aarch64_sha}"
-    else
-      url "https://github.com/{repository}/releases/download/v{version}/quickdep-linux-x86_64.tar.gz"
-      sha256 "{linux_x86_64_sha}"
-    end
+    url "https://github.com/{repository}/releases/download/v{version}/quickdep-linux-x86_64.tar.gz"
+    sha256 "{linux_x86_64_sha}"
   end
 
   def install
@@ -45,7 +40,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repository", required=True)
     parser.add_argument("--tap-repo", required=True)
     parser.add_argument("--darwin-aarch64-sha", required=True)
-    parser.add_argument("--linux-aarch64-sha", required=True)
     parser.add_argument("--linux-x86_64-sha", required=True)
     return parser.parse_args()
 
@@ -61,7 +55,6 @@ def main() -> None:
             version=args.version,
             repository=args.repository,
             darwin_aarch64_sha=args.darwin_aarch64_sha,
-            linux_aarch64_sha=args.linux_aarch64_sha,
             linux_x86_64_sha=args.linux_x86_64_sha,
         )
     )
