@@ -188,7 +188,6 @@ Use the `quickdep` MCP server for symbol lookup, dependency tracing, and cross-f
 Release 产物统一命名：
 
 - `quickdep-darwin-aarch64.tar.gz`
-- `quickdep-darwin-x86_64.tar.gz`
 - `quickdep-linux-x86_64.tar.gz`
 - `quickdep-linux-aarch64.tar.gz`
 - `quickdep-windows-x86_64.zip`

@@ -48,11 +48,9 @@ function resolveAsset() {
   }
 
   if (platform === "darwin" && arch === "x64") {
-    return {
-      name: "quickdep-darwin-x86_64.tar.gz",
-      binaryName: "quickdep",
-      archive: "tar.gz",
-    };
+    throw new Error(
+      "QuickDep npm package does not currently ship a macOS Intel binary. Use Apple Silicon macOS, Linux, or Windows assets instead."
+    );
   }
 
   if (platform === "linux" && arch === "x64") {
