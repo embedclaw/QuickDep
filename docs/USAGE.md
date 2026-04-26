@@ -62,7 +62,7 @@ quickdep --version
 公开分发链路已经在仓库里准备好，但当前还没有真正发布：
 
 - GitHub Releases：目标分发方式，当前仓库还没有公开 release 产物
-- Homebrew：目标命令是 `brew install northcipher/tap/quickdep`，当前公式还未公开可用
+- Homebrew：目标命令是 `brew install embedclaw/tap/quickdep`，实际发布取决于 tap 工作流配置
 - npm 二进制包装器：目标命令是 `npm i -g @northcipher/quickdep`，当前包还未发布
 
 如果你想让 Claude Code / Codex / OpenCode 帮你自动完成安装和接入，直接复制：
@@ -162,6 +162,7 @@ quickdep [OPTIONS] [COMMAND]
 命令列表：
 
 - `serve`：启动 MCP 服务，默认命令
+- `daemon`：管理共享后台服务
 - `scan <path>`：扫描指定项目
 - `status <path>`：查看项目状态
 - `debug <path>`：调试查询
@@ -172,6 +173,12 @@ quickdep [OPTIONS] [COMMAND]
 - `--http-only`：只启用 HTTP，不启用 stdio MCP
 - `--tools a,b,c`：只暴露指定工具
 - `--log-level <debug|info|warn|error>`：设置日志级别
+
+Daemon 子命令：
+
+- `daemon` 或 `daemon run`：以前台方式启动共享后台服务
+- `daemon status`：查看后台服务状态、已托管工作区数量、HTTP listener 数量
+- `daemon stop`：停止后台服务
 
 ---
 

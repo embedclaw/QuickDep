@@ -21,12 +21,12 @@ GitHub Release、Homebrew、npm 的发布链路已经准备好，但当前还没
 1. 先记录我当前的项目目录为 `ORIGINAL_PROJECT_DIR="$(pwd)"`，后面扫描项目时必须回到这个目录。
 2. 识别当前操作系统和 CPU 架构。
 3. 先检查公开分发方式是否真实可用，按这个顺序尝试：
-   - GitHub Releases: https://github.com/Northcipher/QuickDep/releases
-   - Homebrew: brew install northcipher/tap/quickdep
+   - GitHub Releases: https://github.com/embedclaw/QuickDep/releases
+   - Homebrew: brew install embedclaw/tap/quickdep
    - npm: npm i -g @northcipher/quickdep
 4. 如果这三种方式都不可用，回退到源码安装：
    - 如果本机已经有 QuickDep 仓库，就进入仓库根目录执行 `cargo install --path .`
-   - 如果本机还没有 QuickDep 仓库，就先 clone `https://github.com/Northcipher/QuickDep.git`，再执行 `cargo install --path .`
+   - 如果本机还没有 QuickDep 仓库，就先 clone `https://github.com/embedclaw/QuickDep.git`，再执行 `cargo install --path .`
 5. 安装完成后必须验证：
    - `quickdep --version`
    - `quickdep install-mcp claude`
@@ -53,12 +53,12 @@ GitHub Release、Homebrew、npm 的发布链路已经准备好，但当前还没
 1. 先记录我当前的项目目录为 `ORIGINAL_PROJECT_DIR="$(pwd)"`，后面扫描项目时必须回到这个目录。
 2. 识别当前操作系统和 CPU 架构。
 3. 先检查公开分发方式是否真实可用，按这个顺序尝试：
-   - GitHub Releases: https://github.com/Northcipher/QuickDep/releases
-   - Homebrew: brew install northcipher/tap/quickdep
+   - GitHub Releases: https://github.com/embedclaw/QuickDep/releases
+   - Homebrew: brew install embedclaw/tap/quickdep
    - npm: npm i -g @northcipher/quickdep
 4. 如果这三种方式都不可用，回退到源码安装：
    - 如果本机已经有 QuickDep 仓库，就进入仓库根目录执行 `cargo install --path .`
-   - 如果本机还没有 QuickDep 仓库，就先 clone `https://github.com/Northcipher/QuickDep.git`，再执行 `cargo install --path .`
+   - 如果本机还没有 QuickDep 仓库，就先 clone `https://github.com/embedclaw/QuickDep.git`，再执行 `cargo install --path .`
 5. 安装完成后必须验证：
    - `quickdep --version`
    - `quickdep install-mcp codex`
@@ -85,12 +85,12 @@ GitHub Release、Homebrew、npm 的发布链路已经准备好，但当前还没
 1. 先记录我当前的项目目录为 `ORIGINAL_PROJECT_DIR="$(pwd)"`，后面扫描项目时必须回到这个目录。
 2. 识别当前操作系统和 CPU 架构。
 3. 先检查公开分发方式是否真实可用，按这个顺序尝试：
-   - GitHub Releases: https://github.com/Northcipher/QuickDep/releases
-   - Homebrew: brew install northcipher/tap/quickdep
+   - GitHub Releases: https://github.com/embedclaw/QuickDep/releases
+   - Homebrew: brew install embedclaw/tap/quickdep
    - npm: npm i -g @northcipher/quickdep
 4. 如果这三种方式都不可用，回退到源码安装：
    - 如果本机已经有 QuickDep 仓库，就进入仓库根目录执行 `cargo install --path .`
-   - 如果本机还没有 QuickDep 仓库，就先 clone `https://github.com/Northcipher/QuickDep.git`，再执行 `cargo install --path .`
+   - 如果本机还没有 QuickDep 仓库，就先 clone `https://github.com/embedclaw/QuickDep.git`，再执行 `cargo install --path .`
 5. 安装完成后必须验证：
    - `quickdep --version`
    - `quickdep install-mcp opencode`

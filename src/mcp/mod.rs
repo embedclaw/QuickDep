@@ -31,6 +31,7 @@ use crate::{
     cache::{QueryCache, SymbolIndexCache},
     config::{load_settings, Settings},
     core::Symbol,
+    daemon::DaemonClient,
     project::{
         get_manifest_path, ManagerError, Project, ProjectConfig, ProjectId, ProjectManager,
         ProjectState,
@@ -161,6 +162,7 @@ const WORKFLOW_QUEUE_PRIORITY_TERMS: &[&str] = &["next_conflict_queue_head", "qu
 const WORKFLOW_SCHEDULER_PRIORITY_TERMS: &[&str] = &["admit", "dispatchable_head"];
 
 type McpResult<T> = Result<T, McpError>;
+type ToolRouterBuild = (ToolRouter<QuickDepServer>, HashSet<String>, Option<Vec<String>>);
 
 /// Shared project selector used by MCP tools.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
@@ -174,7 +176,7 @@ pub struct ProjectTarget {
 }
 
 /// Parameters for `scan_project`.
-#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ScanProjectRequest {
     /// Target project.
     #[serde(default)]
@@ -185,7 +187,7 @@ pub struct ScanProjectRequest {
 }
 
 /// Parameters for status-like project operations.
-#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ProjectStatusRequest {
     /// Target project.
     #[serde(default)]
@@ -193,7 +195,7 @@ pub struct ProjectStatusRequest {
 }
 
 /// Parameters for `get_project_overview`.
-#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ProjectOverviewRequest {
     /// Target project.
     #[serde(default)]
@@ -207,7 +209,7 @@ pub struct ProjectOverviewRequest {
 }
 
 /// Parameters for `find_interfaces`.
-#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct FindInterfacesRequest {
     /// Target project.
     #[serde(default)]
@@ -220,7 +222,7 @@ pub struct FindInterfacesRequest {
 }
 
 /// Parameters for interface lookup tools.
-#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct InterfaceLookupRequest {
     /// Target project.
     #[serde(default)]
@@ -230,7 +232,7 @@ pub struct InterfaceLookupRequest {
 }
 
 /// Parameters for `get_dependencies`.
-#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DependenciesRequest {
     /// Target project.
     #[serde(default)]
@@ -246,7 +248,7 @@ pub struct DependenciesRequest {
 }
 
 /// Parameters for `get_call_chain`.
-#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CallChainRequest {
     /// Target project.
     #[serde(default)]
@@ -261,7 +263,7 @@ pub struct CallChainRequest {
 }
 
 /// Parameters for `get_file_interfaces`.
-#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct FileInterfacesRequest {
     /// Target project.
     #[serde(default)]
@@ -348,7 +350,7 @@ pub struct TaskContextRequest {
 }
 
 /// One query inside `batch_query`.
-#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct BatchQueryItem {
     /// Query kind.
     pub kind: String,
@@ -379,7 +381,7 @@ pub struct BatchQueryItem {
 }
 
 /// Parameters for `batch_query`.
-#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct BatchQueryRequest {
     /// Target project.
     #[serde(default)]
@@ -762,13 +764,15 @@ pub struct QuickDepServer {
     watchers: Arc<RwLock<HashMap<ProjectId, ProjectWatcherHandle>>>,
     idle_checker_started: Arc<AtomicBool>,
     enabled_tools: Arc<HashSet<String>>,
+    tool_filter: Option<Vec<String>>,
+    daemon_client: Option<DaemonClient>,
     tool_router: ToolRouter<Self>,
 }
 
 impl QuickDepServer {
     /// Create a server for the given workspace root and register the workspace project.
     pub async fn from_workspace(workspace_root: impl AsRef<Path>) -> anyhow::Result<Self> {
-        Self::from_workspace_inner(workspace_root.as_ref(), None).await
+        Self::from_workspace_inner(workspace_root.as_ref(), None, None).await
     }
 
     /// Create a server that exposes only a selected subset of tools.
@@ -776,12 +780,60 @@ impl QuickDepServer {
         workspace_root: impl AsRef<Path>,
         allowed_tools: Vec<String>,
     ) -> anyhow::Result<Self> {
-        Self::from_workspace_inner(workspace_root.as_ref(), Some(allowed_tools)).await
+        Self::from_workspace_inner(workspace_root.as_ref(), Some(allowed_tools), None).await
+    }
+
+    /// Create a server that reuses an existing project manager.
+    pub async fn from_workspace_with_manager_and_tools(
+        workspace_root: impl AsRef<Path>,
+        manager: Arc<ProjectManager>,
+        allowed_tools: Option<Vec<String>>,
+    ) -> anyhow::Result<Self> {
+        Self::from_workspace_inner(workspace_root.as_ref(), allowed_tools, Some(manager)).await
+    }
+
+    /// Create a stdio/HTTP proxy server that forwards requests to the shared daemon.
+    pub async fn from_daemon_proxy(
+        workspace_root: impl AsRef<Path>,
+        allowed_tools: Option<Vec<String>>,
+    ) -> anyhow::Result<Self> {
+        let workspace_root = workspace_root.as_ref().canonicalize().with_context(|| {
+            format!(
+                "failed to canonicalize workspace root {}",
+                workspace_root.as_ref().display()
+            )
+        })?;
+        if !workspace_root.is_dir() {
+            return Err(anyhow!(
+                "workspace root must be a directory: {}",
+                workspace_root.display()
+            ));
+        }
+
+        let manifest_path = get_manifest_path(&workspace_root);
+        let manager = Arc::new(ProjectManager::new(&manifest_path));
+        let default_project_id = ProjectId::from_path(&workspace_root)?;
+        let (tool_router, enabled_tools, tool_filter) =
+            Self::build_tool_router(allowed_tools.as_deref())?;
+
+        Ok(Self {
+            workspace_root,
+            default_project_id,
+            manager,
+            caches: Arc::new(RwLock::new(HashMap::new())),
+            watchers: Arc::new(RwLock::new(HashMap::new())),
+            idle_checker_started: Arc::new(AtomicBool::new(false)),
+            enabled_tools: Arc::new(enabled_tools),
+            tool_filter,
+            daemon_client: Some(DaemonClient::connect_or_start().await?),
+            tool_router,
+        })
     }
 
     async fn from_workspace_inner(
         workspace_root: &Path,
         allowed_tools: Option<Vec<String>>,
+        manager: Option<Arc<ProjectManager>>,
     ) -> anyhow::Result<Self> {
         let workspace_root = workspace_root.canonicalize().with_context(|| {
             format!(
@@ -797,11 +849,17 @@ impl QuickDepServer {
             ));
         }
 
-        let manifest_path = get_manifest_path(&workspace_root);
-        let manager = Arc::new(ProjectManager::with_scanner(&manifest_path).await);
+        let manager = match manager {
+            Some(manager) => manager,
+            None => {
+                let manifest_path = get_manifest_path(&workspace_root);
+                Arc::new(ProjectManager::with_scanner(&manifest_path).await)
+            }
+        };
         let default_project_id =
             Self::register_project_with_manager(manager.as_ref(), &workspace_root).await?;
-        let (tool_router, enabled_tools) = Self::build_tool_router(allowed_tools.as_deref())?;
+        let (tool_router, enabled_tools, tool_filter) =
+            Self::build_tool_router(allowed_tools.as_deref())?;
 
         Ok(Self {
             workspace_root,
@@ -811,6 +869,8 @@ impl QuickDepServer {
             watchers: Arc::new(RwLock::new(HashMap::new())),
             idle_checker_started: Arc::new(AtomicBool::new(false)),
             enabled_tools: Arc::new(enabled_tools),
+            tool_filter,
+            daemon_client: None,
             tool_router,
         })
     }
@@ -828,7 +888,7 @@ impl QuickDepServer {
 
     fn build_tool_router(
         allowed_tools: Option<&[String]>,
-    ) -> anyhow::Result<(ToolRouter<Self>, HashSet<String>)> {
+    ) -> anyhow::Result<ToolRouterBuild> {
         let mut tool_router = Self::tool_router();
         let available_tools = tool_router
             .list_all()
@@ -838,7 +898,7 @@ impl QuickDepServer {
         let available_tool_set = available_tools.iter().cloned().collect::<HashSet<_>>();
 
         let Some(allowed_tools) = allowed_tools else {
-            return Ok((tool_router, available_tool_set));
+            return Ok((tool_router, available_tool_set, None));
         };
 
         let selected_tools = allowed_tools
@@ -868,13 +928,42 @@ impl QuickDepServer {
             .map
             .retain(|name, _| selected_tools.contains(name.as_ref()));
 
-        Ok((tool_router, selected_tools))
+        let mut tool_filter = selected_tools.iter().cloned().collect::<Vec<_>>();
+        tool_filter.sort();
+        Ok((tool_router, selected_tools, Some(tool_filter)))
     }
 
     /// Return whether a tool is enabled on this server instance.
     #[must_use]
     pub fn is_tool_enabled(&self, name: &str) -> bool {
         self.enabled_tools.contains(name)
+    }
+
+    fn remote_client(&self) -> Option<&DaemonClient> {
+        self.daemon_client.as_ref()
+    }
+
+    fn allowed_tools_for_proxy(&self) -> Option<Vec<String>> {
+        self.tool_filter.clone()
+    }
+
+    async fn proxy_tool<T: Serialize>(&self, tool: &str, request: &T) -> McpResult<Value> {
+        let client = self
+            .remote_client()
+            .ok_or_else(|| Self::internal_error("daemon client is not configured"))?;
+        client
+            .invoke_tool(
+                &self.workspace_root,
+                tool,
+                request,
+                self.allowed_tools_for_proxy(),
+            )
+            .await
+            .map_err(|error| Self::internal_error(error.to_string()))
+    }
+
+    async fn proxy_tool_without_args(&self, tool: &str) -> McpResult<Value> {
+        self.proxy_tool(tool, &json!({})).await
     }
 
     fn disabled_tool_error(name: &str) -> McpError {
@@ -4710,7 +4799,7 @@ impl QuickDepServer {
         default_project_id: ProjectId,
         manager: Arc<ProjectManager>,
     ) -> Self {
-        let (tool_router, enabled_tools) =
+        let (tool_router, enabled_tools, tool_filter) =
             Self::build_tool_router(None).expect("default tool router should be valid");
         Self {
             workspace_root,
@@ -4720,6 +4809,8 @@ impl QuickDepServer {
             watchers: Arc::new(RwLock::new(HashMap::new())),
             idle_checker_started: Arc::new(AtomicBool::new(false)),
             enabled_tools: Arc::new(enabled_tools),
+            tool_filter,
+            daemon_client: None,
             tool_router,
         }
     }
@@ -4732,6 +4823,9 @@ impl QuickDepServer {
     /// List every known project.
     #[tool(description = "List registered QuickDep projects")]
     pub async fn list_projects(&self) -> McpResult<Json<Value>> {
+        if self.remote_client().is_some() {
+            return Ok(Json(self.proxy_tool_without_args("list_projects").await?));
+        }
         Ok(Json(self.list_projects_value().await?))
     }
 
@@ -4741,6 +4835,9 @@ impl QuickDepServer {
         &self,
         Parameters(request): Parameters<ScanProjectRequest>,
     ) -> McpResult<Json<Value>> {
+        if self.remote_client().is_some() {
+            return Ok(Json(self.proxy_tool("scan_project", &request).await?));
+        }
         Ok(Json(self.scan_project_value(request).await?))
     }
 
@@ -4750,6 +4847,9 @@ impl QuickDepServer {
         &self,
         Parameters(request): Parameters<ProjectStatusRequest>,
     ) -> McpResult<Json<Value>> {
+        if self.remote_client().is_some() {
+            return Ok(Json(self.proxy_tool("get_scan_status", &request).await?));
+        }
         Ok(Json(self.get_scan_status_value(request).await?))
     }
 
@@ -4761,6 +4861,11 @@ impl QuickDepServer {
         &self,
         Parameters(request): Parameters<ProjectOverviewRequest>,
     ) -> McpResult<Json<Value>> {
+        if self.remote_client().is_some() {
+            return Ok(Json(
+                self.proxy_tool("get_project_overview", &request).await?,
+            ));
+        }
         Ok(Json(self.get_project_overview_value(request).await?))
     }
 
@@ -4770,6 +4875,9 @@ impl QuickDepServer {
         &self,
         Parameters(request): Parameters<ProjectStatusRequest>,
     ) -> McpResult<Json<Value>> {
+        if self.remote_client().is_some() {
+            return Ok(Json(self.proxy_tool("cancel_scan", &request).await?));
+        }
         Ok(Json(self.cancel_scan_value(request).await?))
     }
 
@@ -4781,6 +4889,9 @@ impl QuickDepServer {
         &self,
         Parameters(request): Parameters<FindInterfacesRequest>,
     ) -> McpResult<Json<Value>> {
+        if self.remote_client().is_some() {
+            return Ok(Json(self.proxy_tool("find_interfaces", &request).await?));
+        }
         Ok(Json(self.find_interfaces_value(request).await?))
     }
 
@@ -4792,6 +4903,9 @@ impl QuickDepServer {
         &self,
         Parameters(request): Parameters<InterfaceLookupRequest>,
     ) -> McpResult<Json<Value>> {
+        if self.remote_client().is_some() {
+            return Ok(Json(self.proxy_tool("get_interface", &request).await?));
+        }
         Ok(Json(self.get_interface_value(request).await?))
     }
 
@@ -4803,6 +4917,9 @@ impl QuickDepServer {
         &self,
         Parameters(request): Parameters<DependenciesRequest>,
     ) -> McpResult<Json<Value>> {
+        if self.remote_client().is_some() {
+            return Ok(Json(self.proxy_tool("get_dependencies", &request).await?));
+        }
         Ok(Json(self.get_dependencies_value(request).await?))
     }
 
@@ -4812,6 +4929,9 @@ impl QuickDepServer {
         &self,
         Parameters(request): Parameters<CallChainRequest>,
     ) -> McpResult<Json<Value>> {
+        if self.remote_client().is_some() {
+            return Ok(Json(self.proxy_tool("get_call_chain", &request).await?));
+        }
         Ok(Json(self.get_call_chain_value(request).await?))
     }
 
@@ -4821,6 +4941,9 @@ impl QuickDepServer {
         &self,
         Parameters(request): Parameters<FileInterfacesRequest>,
     ) -> McpResult<Json<Value>> {
+        if self.remote_client().is_some() {
+            return Ok(Json(self.proxy_tool("get_file_interfaces", &request).await?));
+        }
         Ok(Json(self.get_file_interfaces_value(request).await?))
     }
 
@@ -4832,6 +4955,9 @@ impl QuickDepServer {
         &self,
         Parameters(request): Parameters<TaskContextRequest>,
     ) -> McpResult<Json<Value>> {
+        if self.remote_client().is_some() {
+            return Ok(Json(self.proxy_tool("get_task_context", &request).await?));
+        }
         Ok(Json(self.get_task_context_value(request).await?))
     }
 
@@ -4843,6 +4969,11 @@ impl QuickDepServer {
         &self,
         Parameters(request): Parameters<TaskContextRequest>,
     ) -> McpResult<Json<Value>> {
+        if self.remote_client().is_some() {
+            return Ok(Json(
+                self.proxy_tool("analyze_workflow_context", &request).await?,
+            ));
+        }
         Ok(Json(
             self.get_task_context_value(Self::force_task_context_mode(request, "workflow"))
                 .await?,
@@ -4857,6 +4988,11 @@ impl QuickDepServer {
         &self,
         Parameters(request): Parameters<TaskContextRequest>,
     ) -> McpResult<Json<Value>> {
+        if self.remote_client().is_some() {
+            return Ok(Json(
+                self.proxy_tool("analyze_change_impact", &request).await?,
+            ));
+        }
         Ok(Json(
             self.get_task_context_value(Self::force_task_context_mode(request, "impact"))
                 .await?,
@@ -4871,6 +5007,11 @@ impl QuickDepServer {
         &self,
         Parameters(request): Parameters<TaskContextRequest>,
     ) -> McpResult<Json<Value>> {
+        if self.remote_client().is_some() {
+            return Ok(Json(
+                self.proxy_tool("analyze_behavior_context", &request).await?,
+            ));
+        }
         Ok(Json(
             self.get_task_context_value(Self::force_task_context_mode(request, "behavior"))
                 .await?,
@@ -4885,6 +5026,11 @@ impl QuickDepServer {
         &self,
         Parameters(request): Parameters<TaskContextRequest>,
     ) -> McpResult<Json<Value>> {
+        if self.remote_client().is_some() {
+            return Ok(Json(
+                self.proxy_tool("locate_relevant_code", &request).await?,
+            ));
+        }
         Ok(Json(
             self.get_task_context_value(Self::force_task_context_mode(request, "locate"))
                 .await?,
@@ -4897,6 +5043,9 @@ impl QuickDepServer {
         &self,
         Parameters(request): Parameters<BatchQueryRequest>,
     ) -> McpResult<Json<Value>> {
+        if self.remote_client().is_some() {
+            return Ok(Json(self.proxy_tool("batch_query", &request).await?));
+        }
         Ok(Json(self.batch_query_value(request).await?))
     }
 
@@ -4906,6 +5055,9 @@ impl QuickDepServer {
         &self,
         Parameters(request): Parameters<ProjectStatusRequest>,
     ) -> McpResult<Json<Value>> {
+        if self.remote_client().is_some() {
+            return Ok(Json(self.proxy_tool("rebuild_database", &request).await?));
+        }
         Ok(Json(self.rebuild_database_value(request).await?))
     }
 }

@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 use quickdep::{
     cli::{self, ClaudeScope, InstallMcpOptions, McpClient},
     config::load_settings,
-    http,
+    daemon::{self, DaemonClient},
     log::{init_logging, LogLevel},
     mcp::QuickDepServer,
     VERSION,
@@ -44,6 +44,12 @@ struct Cli {
 enum Commands {
     /// Start the QuickDep MCP server
     Serve,
+
+    /// Manage the shared QuickDep daemon
+    Daemon {
+        #[command(subcommand)]
+        command: Option<DaemonCommands>,
+    },
 
     /// Debug and inspect project
     Debug {
@@ -107,6 +113,16 @@ enum Commands {
     },
 }
 
+#[derive(Subcommand)]
+enum DaemonCommands {
+    /// Run the daemon in the foreground
+    Run,
+    /// Show daemon status
+    Status,
+    /// Stop the running daemon
+    Stop,
+}
+
 #[derive(clap::ValueEnum, Clone, Copy)]
 enum InstallMcpClient {
     Claude,
@@ -132,6 +148,7 @@ fn default_log_dir(command: &Option<Commands>, current_dir: &std::path::Path) ->
         {
             path
         }
+        Some(Commands::Daemon { .. }) => current_dir,
         _ => current_dir,
     };
 
@@ -150,6 +167,7 @@ async fn main() -> anyhow::Result<()> {
         {
             load_settings(path).ok()
         }
+        Some(Commands::Daemon { .. }) => load_settings(&current_dir).ok(),
         _ if current_dir.exists() => load_settings(&current_dir).ok(),
         _ => None,
     };
@@ -175,31 +193,43 @@ async fn main() -> anyhow::Result<()> {
                     .then_some(settings.server.http_port))
             };
 
-            info!("Starting QuickDep MCP server v{}", VERSION);
-            let server = if cli.tools.is_empty() {
-                QuickDepServer::from_workspace(&current_dir).await?
-            } else {
-                QuickDepServer::from_workspace_with_tools(&current_dir, cli.tools.clone()).await?
-            };
+            info!("Starting QuickDep MCP proxy v{}", VERSION);
+            let daemon_client = DaemonClient::connect_or_start().await?;
+            let tool_filter = (!cli.tools.is_empty()).then_some(cli.tools.clone());
 
             if let Some(port) = http_port {
-                info!("HTTP server enabled on port {}", port);
-                if cli.http_only {
-                    http::serve_http_server(server, port).await?;
-                } else {
-                    let _http_handle = http::spawn_http_server(server.clone(), port).await?;
-                    server
-                        .serve(rmcp::transport::io::stdio())
-                        .await?
-                        .waiting()
-                        .await?;
-                }
-            } else {
-                server
-                    .serve(rmcp::transport::io::stdio())
-                    .await?
-                    .waiting()
+                let response = daemon_client
+                    .ensure_http(&current_dir, port, tool_filter.clone())
                     .await?;
+                info!("Daemon HTTP endpoint ready at {}", response["url"]);
+                if cli.http_only {
+                    println!("{}", serde_json::to_string_pretty(&response)?);
+                    return Ok(());
+                }
+            }
+
+            let server = if cli.tools.is_empty() {
+                QuickDepServer::from_daemon_proxy(&current_dir, None).await?
+            } else {
+                QuickDepServer::from_daemon_proxy(&current_dir, Some(cli.tools.clone())).await?
+            };
+
+            server
+                .serve(rmcp::transport::io::stdio())
+                .await?
+                .waiting()
+                .await?;
+        }
+
+        Commands::Daemon { command } => match command.unwrap_or(DaemonCommands::Run) {
+            DaemonCommands::Run => daemon::run_foreground().await?,
+            DaemonCommands::Status => {
+                let output = daemon::daemon_status().await?;
+                println!("{}", serde_json::to_string_pretty(&output)?);
+            }
+            DaemonCommands::Stop => {
+                let output = daemon::stop_daemon().await?;
+                println!("{}", serde_json::to_string_pretty(&output)?);
             }
         }
 

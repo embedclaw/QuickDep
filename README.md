@@ -19,7 +19,7 @@ Instead of making Claude, Codex, or your own tooling grep a large codebase blind
 - What is the shortest call path between two symbols?
 - Which file owns these related declarations?
 
-It runs locally, persists graph data in SQLite, updates incrementally, and exposes the result through MCP, HTTP, WebSocket, and a local web UI.
+It runs locally, persists graph data in SQLite, keeps a single shared daemon warm across frontends, and exposes the result through MCP, HTTP, WebSocket, and a local web UI.
 QuickDep is MIT licensed and designed for real coding workflows where agents need to find the right files before they can reason correctly.
 
 ## Web UI
@@ -32,7 +32,7 @@ The right side is visual: project-level relation cloud, symbol-level dependency 
 
 ### Start the web UI
 
-1. Start QuickDep with HTTP enabled:
+1. Ask the daemon to ensure a local HTTP endpoint:
 
    ```bash
    quickdep --http 8080 --http-only
@@ -60,7 +60,7 @@ The right side is visual: project-level relation cloud, symbol-level dependency 
 8. Use the `+`, `-`, and `Reset` controls in the bottom-right corner to zoom and recenter
 
 The browser UI does not require editing `quickdep.toml`.
-It talks to the same local QuickDep HTTP service that MCP clients and API consumers use.
+It talks to the same daemon-backed local QuickDep HTTP service that MCP clients and API consumers use.
 
 ## The Question QuickDep Answers Better Than grep
 
@@ -161,13 +161,13 @@ As of `2026-04-24`, the verified working path is source install plus `install-mc
 
 | Method | Current status | Verification result |
 | --- | --- | --- |
-| `cargo install --path .` | Available | Installed successfully and `quickdep --version` returned `0.1.0` |
+| `cargo install --path .` | Available | Installed successfully and `quickdep --version` returned `0.1.2` |
 | `quickdep install-mcp claude` | Available | Verified and visible in `claude mcp list` |
 | `quickdep install-mcp codex` | Available | Verified and visible in `codex mcp list` |
 | `quickdep install-mcp opencode` | Available | Verified and visible in `opencode mcp list` |
-| GitHub Release | Not published | `releases/latest/download/...` currently returns `404` |
-| Homebrew | Not published | `Formula/quickdep.rb` currently returns `404` |
-| npm | Not published | `npm view @northcipher/quickdep` currently returns `E404` |
+| GitHub Release | Tag-triggered publish | Pushing `v0.1.2` to `embedclaw/QuickDep` starts the release workflow |
+| Homebrew | Workflow-ready | Formula publish depends on tap credentials in the release workflow |
+| npm | Workflow-ready | npm publish depends on `NPM_TOKEN` in the release workflow |
 
 If you want a working install today:
 
@@ -188,7 +188,7 @@ If you want Claude Code, Codex, or OpenCode to do the install for you, use this 
 
 - [docs/AGENT_INSTALL_PROMPT.md](docs/AGENT_INSTALL_PROMPT.md)
 
-Verify that the local service is alive:
+Verify that the daemon-backed local service is alive:
 
 ```bash
 # terminal 1
@@ -205,17 +205,25 @@ More distribution and integration details:
 
 ## 30-Second Start and Verify
 
-QuickDep defaults to `serve`, so `quickdep` starts the local stdio MCP server immediately:
+QuickDep defaults to `serve`, so `quickdep` starts a local stdio MCP proxy immediately. The proxy talks to a shared background daemon:
 
 ```bash
 # Start local stdio MCP in the current workspace
 quickdep
 
-# Start MCP stdio + HTTP on localhost:8080
+# Start MCP stdio + daemon-backed HTTP on localhost:8080
 quickdep --http 8080
 
-# HTTP only
+# Ensure HTTP only, then return
 quickdep --http 8080 --http-only
+```
+
+Daemon management commands:
+
+```bash
+quickdep daemon
+quickdep daemon status
+quickdep daemon stop
 ```
 
 If you want a fast health check before wiring it into an MCP client:

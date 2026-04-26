@@ -14,4 +14,4 @@ quickdep
 
 See the main project for usage and MCP integration details:
 
-- https://github.com/Northcipher/QuickDep
+- https://github.com/embedclaw/QuickDep

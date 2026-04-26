@@ -1,13 +1,13 @@
 {
   "name": "@northcipher/quickdep",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Binary wrapper for QuickDep",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Northcipher/QuickDep.git"
+    "url": "git+https://github.com/embedclaw/QuickDep.git"
   },
-  "homepage": "https://github.com/Northcipher/QuickDep",
+  "homepage": "https://github.com/embedclaw/QuickDep",
   "bin": {
     "quickdep": "bin/quickdep.js"
   },

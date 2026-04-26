@@ -2,7 +2,7 @@
 
 ## 1. 目标
 
-QuickDep 的推荐运行形态是本地 `stdio MCP` 服务：
+QuickDep 的推荐运行形态是本地 `stdio MCP` 代理服务：
 
 ```bash
 quickdep serve
@@ -18,23 +18,24 @@ quickdep serve
 
 - QuickDep 需要直接访问本机仓库
 - 需要在本地创建 `.quickdep/` 数据和 watcher
+- `serve` 只是代理入口，真正的项目状态由本地 daemon 统一持有
 - 不需要额外部署远程服务
 
 ---
 
 ## 2. 安装 QuickDep
 
-截至 `2026-04-24`，当前实际验证结果如下：
+截至 `2026-04-27`，当前实际验证结果如下：
 
 | 路径 | 状态 | 验证方式 |
 | --- | --- | --- |
-| `cargo install --path .` | 已验证可用 | 实测安装成功，`quickdep --version` 返回 `0.1.0` |
+| `cargo install --path .` | 已验证可用 | 实测安装成功，`quickdep --version` 返回 `0.1.2` |
 | `quickdep install-mcp claude` | 已验证可用 | `claude mcp list` 显示 QuickDep 已连接 |
 | `quickdep install-mcp codex` | 已验证可用 | `codex mcp list` 可见 QuickDep |
 | `quickdep install-mcp opencode` | 已验证可用 | `opencode mcp list` 显示 QuickDep 已连接 |
-| GitHub Releases | 尚未发布 | 最新下载地址当前返回 `404` |
-| Homebrew | 尚未发布 | `Formula/quickdep.rb` 当前返回 `404` |
-| npm 包装器 | 尚未发布 | `npm view @northcipher/quickdep` 当前返回 `E404` |
+| GitHub Releases | tag 驱动发布 | 推送 `v0.1.2` 到 `embedclaw/QuickDep` 后自动构建并发布 |
+| Homebrew | 工作流已就绪 | 是否真正发布取决于 release workflow 中的 tap 凭证 |
+| npm 包装器 | 工作流已就绪 | 是否真正发布取决于 release workflow 中的 `NPM_TOKEN` |
 
 所以今天如果要真正装起来，应该直接用源码安装：
 
@@ -183,7 +184,7 @@ Use the `quickdep` MCP server for symbol lookup, dependency tracing, and cross-f
 
 ### 6.1 GitHub Releases
 
-发布工作流已经配置好；在仓库打 `v*` tag 后，会构建以下产物并准备上传。当前仓库还没有公开 release，所以这些 URL 还不能直接下载。
+发布工作流已经配置好；在仓库打 `v*` tag 后，会构建以下产物并上传到 GitHub Release。
 
 Release 产物统一命名：
 
@@ -199,7 +200,7 @@ Release 产物统一命名：
 Homebrew 计划使用独立 tap，例如：
 
 ```bash
-brew install northcipher/tap/quickdep
+brew install embedclaw/tap/quickdep
 ```
 
 公式脚本已经准备好，但 tap / formula 当前还没有公开发布。发布后，公式会直接引用 GitHub Release 产物和 SHA256。

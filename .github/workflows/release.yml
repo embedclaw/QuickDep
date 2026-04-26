@@ -175,7 +175,7 @@ jobs:
         if: ${{ env.HOMEBREW_TAP_TOKEN != '' }}
         uses: actions/checkout@v4
         with:
-          repository: Northcipher/homebrew-tap
+          repository: embedclaw/homebrew-tap
           token: ${{ env.HOMEBREW_TAP_TOKEN }}
           path: tap
 
@@ -186,7 +186,7 @@ jobs:
           set -euo pipefail
           python3 packaging/homebrew/update_formula.py \
             --version "${GITHUB_REF_NAME#v}" \
-            --repository "Northcipher/QuickDep" \
+            --repository "embedclaw/QuickDep" \
             --tap-repo tap \
             --darwin-aarch64-sha "$(sha256sum release/quickdep-darwin-aarch64.tar.gz | awk '{print $1}')" \
             --linux-x86_64-sha "$(sha256sum release/quickdep-linux-x86_64.tar.gz | awk '{print $1}')"
