@@ -141,8 +141,16 @@ fn default_exclude() -> Vec<String> {
         "node_modules/**".to_string(),
         ".git/**".to_string(),
         ".quickdep/**".to_string(),
+        ".research/**".to_string(),
+        ".cache/**".to_string(),
         "dist/**".to_string(),
         "build/**".to_string(),
+        "out/**".to_string(),
+        "coverage/**".to_string(),
+        "artifacts/**".to_string(),
+        "tmp/**".to_string(),
+        ".tmp/**".to_string(),
+        "temp/**".to_string(),
         "venv/**".to_string(),
         ".venv/**".to_string(),
         "__pycache__/**".to_string(),
@@ -591,20 +599,7 @@ mod tests {
         let settings = Settings::default();
 
         assert_eq!(settings.scan.include, vec!["**/*"]);
-        assert_eq!(
-            settings.scan.exclude,
-            vec![
-                "target/**",
-                "node_modules/**",
-                ".git/**",
-                ".quickdep/**",
-                "dist/**",
-                "build/**",
-                "venv/**",
-                ".venv/**",
-                "__pycache__/**"
-            ]
-        );
+        assert_eq!(settings.scan.exclude, default_exclude());
         assert!(!settings.scan.include_tests);
         assert_eq!(
             settings.scan.languages,

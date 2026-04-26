@@ -311,6 +311,9 @@ mod tests {
         let settings = loader.load().unwrap();
 
         assert_eq!(settings.scan.include, vec!["**/*"]);
+        assert!(settings.scan.exclude.contains(&".research/**".to_string()));
+        assert!(settings.scan.exclude.contains(&"tmp/**".to_string()));
+        assert!(settings.scan.exclude.contains(&"coverage/**".to_string()));
     }
 
     #[test]
@@ -438,6 +441,9 @@ include = []
         assert!(content.contains("[server]"));
         assert!(content.contains("[log]"));
         assert!(content.contains("[watcher]"));
+        assert!(content.contains(".research/**"));
+        assert!(content.contains("tmp/**"));
+        assert!(content.contains("coverage/**"));
     }
 
     #[test]
