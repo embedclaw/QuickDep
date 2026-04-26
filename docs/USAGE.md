@@ -290,7 +290,17 @@ QuickDep 会按以下顺序查找配置：
 ```toml
 [scan]
 include = ["src/**"]
-exclude = ["target/**", "node_modules/**"]
+exclude = [
+  "target/**",
+  "node_modules/**",
+  ".research/**",
+  ".cache/**",
+  "coverage/**",
+  "artifacts/**",
+  "tmp/**",
+  ".tmp/**",
+  "temp/**",
+]
 include_tests = false
 languages = ["rust", "typescript", "ruby", "swift", "objc", "python", "go", "c", "cpp"]
 
@@ -313,6 +323,7 @@ idle_timeout = "5m"
 说明：
 
 - 默认配置已经开启 Rust、TypeScript、JavaScript、Java、C#、Kotlin、PHP、Ruby、Swift、Objective-C、Python、Go、C、C++
+- 默认会排除常见构建目录、缓存目录、分析产物和临时目录；像 `.research/`、`coverage/`、`artifacts/`、`tmp/` 这类高噪声路径不会进入索引
 - `scan.languages` 控制启用哪些语言解析器
 - `parser.map` 可把自定义扩展映射到已有解析器
 - `watcher.idle_timeout` 控制项目空闲后多久暂停监控

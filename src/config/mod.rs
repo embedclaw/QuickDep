@@ -17,7 +17,7 @@
 //! ```toml
 //! [scan]
 //! include = ["src/**"]
-//! exclude = ["target/**", "node_modules/**"]
+//! exclude = ["target/**", "node_modules/**", ".research/**", "tmp/**", "coverage/**"]
 //! include_tests = false
 //! languages = ["rust", "typescript", "javascript", "java", "csharp", "kotlin", "php", "ruby", "swift", "objc"]
 //!
