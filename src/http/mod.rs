@@ -168,6 +168,62 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_rest_project_overview_endpoint() {
+        let (_temp_dir, server) = sample_server().await;
+        let router = build_router(server.clone());
+
+        let scan_response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/api/projects/scan")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from("{}"))
+                    .expect("Failed to build scan request"),
+            )
+            .await
+            .expect("Scan request failed");
+        assert_eq!(scan_response.status(), StatusCode::OK);
+
+        let overview_response = router
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/api/projects/overview")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(r#"{"max_symbols":10,"max_edges":10}"#))
+                    .expect("Failed to build overview request"),
+            )
+            .await
+            .expect("Overview request failed");
+        assert_eq!(overview_response.status(), StatusCode::OK);
+
+        let body = to_bytes(overview_response.into_body(), usize::MAX)
+            .await
+            .expect("Failed to read response body");
+        let payload: serde_json::Value =
+            serde_json::from_slice(&body).expect("Failed to parse overview response");
+        assert_eq!(payload["overview"]["total_symbols"], 2);
+        assert_eq!(payload["overview"]["displayed_symbols"], 2);
+        assert_eq!(payload["overview"]["total_edges"], 1);
+        assert_eq!(payload["overview"]["displayed_edges"], 1);
+
+        let node_names = payload["overview"]["nodes"]
+            .as_array()
+            .expect("nodes should be an array")
+            .iter()
+            .map(|node| node["name"].as_str().expect("node name"))
+            .collect::<Vec<_>>();
+        assert!(node_names.contains(&"entry"));
+        assert!(node_names.contains(&"helper"));
+
+        let edge = &payload["overview"]["edges"][0];
+        assert_eq!(edge["weight"], 1);
+        assert_eq!(edge["kinds"][0], "call");
+    }
+
+    #[tokio::test]
     async fn test_rest_task_context_endpoint() {
         let (_temp_dir, server) = sample_server().await;
         let router = build_router(server.clone());

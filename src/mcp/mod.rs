@@ -42,6 +42,10 @@ use crate::{
 
 const DEFAULT_SEARCH_LIMIT: usize = 20;
 const DEFAULT_DEPENDENCY_DEPTH: u32 = 3;
+const DEFAULT_OVERVIEW_SYMBOL_LIMIT: usize = 80;
+const DEFAULT_OVERVIEW_EDGE_LIMIT: usize = 160;
+const MAX_OVERVIEW_SYMBOL_LIMIT: usize = 500;
+const MAX_OVERVIEW_EDGE_LIMIT: usize = 1_000;
 const DEFAULT_CONTEXT_SYMBOL_LIMIT: usize = 5;
 const DEFAULT_CONTEXT_FILE_LIMIT: usize = 5;
 const DEFAULT_CONTEXT_EXPANSIONS: u32 = 1;
@@ -186,6 +190,20 @@ pub struct ProjectStatusRequest {
     /// Target project.
     #[serde(default)]
     pub project: ProjectTarget,
+}
+
+/// Parameters for `get_project_overview`.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct ProjectOverviewRequest {
+    /// Target project.
+    #[serde(default)]
+    pub project: ProjectTarget,
+    /// Maximum number of graph nodes to return.
+    #[serde(default)]
+    pub max_symbols: Option<usize>,
+    /// Maximum number of graph edges to return.
+    #[serde(default)]
+    pub max_edges: Option<usize>,
 }
 
 /// Parameters for `find_interfaces`.
@@ -1483,6 +1501,35 @@ impl QuickDepServer {
         }))
     }
 
+    async fn get_project_overview_value(
+        &self,
+        request: ProjectOverviewRequest,
+    ) -> McpResult<Value> {
+        let max_symbols = request.max_symbols.unwrap_or(DEFAULT_OVERVIEW_SYMBOL_LIMIT);
+        let max_edges = request.max_edges.unwrap_or(DEFAULT_OVERVIEW_EDGE_LIMIT);
+
+        if max_symbols == 0 || max_edges == 0 {
+            return Err(Self::invalid_params(
+                "max_symbols and max_edges must be greater than 0",
+            ));
+        }
+
+        let max_symbols = max_symbols.min(MAX_OVERVIEW_SYMBOL_LIMIT);
+        let max_edges = max_edges.min(MAX_OVERVIEW_EDGE_LIMIT);
+        let project = self.ensure_project_loaded(&request.project).await?;
+        let project_record = self.project_record(&project.id).await?;
+
+        let overview = Self::blocking_storage(project.database_path(), move |storage| {
+            Self::build_project_overview(&storage, max_symbols, max_edges)
+        })
+        .await?;
+
+        Ok(json!({
+            "project": project_record,
+            "overview": overview,
+        }))
+    }
+
     async fn find_interfaces_value(&self, request: FindInterfacesRequest) -> McpResult<Value> {
         let query = request.query.trim().to_string();
         if query.is_empty() {
@@ -2046,6 +2093,164 @@ impl QuickDepServer {
             "visibility": symbol.visibility,
             "source": symbol.source,
         })
+    }
+
+    fn build_project_overview(
+        storage: &Storage,
+        max_symbols: usize,
+        max_edges: usize,
+    ) -> Result<Value, String> {
+        let conn = storage.connection();
+        let total_symbols: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM symbols WHERE source = 'local'",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|error| error.to_string())?;
+        let total_edges: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM (
+                    SELECT d.from_symbol, d.to_symbol
+                    FROM dependencies d
+                    JOIN symbols source_symbol ON source_symbol.id = d.from_symbol
+                    JOIN symbols target_symbol ON target_symbol.id = d.to_symbol
+                    WHERE source_symbol.source = 'local'
+                      AND target_symbol.source = 'local'
+                    GROUP BY d.from_symbol, d.to_symbol
+                )",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|error| error.to_string())?;
+
+        let mut symbol_stmt = conn
+            .prepare(
+                "SELECT
+                    s.id,
+                    s.name,
+                    s.qualified_name,
+                    s.kind,
+                    s.file_path,
+                    s.line,
+                    s.column,
+                    s.visibility,
+                    s.source,
+                    COALESCE(incoming.count, 0) AS incoming_count,
+                    COALESCE(outgoing.count, 0) AS outgoing_count,
+                    COALESCE(incoming.count, 0) + COALESCE(outgoing.count, 0) AS degree
+                FROM symbols s
+                LEFT JOIN (
+                    SELECT to_symbol AS symbol_id, COUNT(*) AS count
+                    FROM dependencies
+                    GROUP BY to_symbol
+                ) incoming ON incoming.symbol_id = s.id
+                LEFT JOIN (
+                    SELECT from_symbol AS symbol_id, COUNT(*) AS count
+                    FROM dependencies
+                    GROUP BY from_symbol
+                ) outgoing ON outgoing.symbol_id = s.id
+                WHERE s.source = 'local'
+                ORDER BY degree DESC, s.qualified_name ASC
+                LIMIT ?1",
+            )
+            .map_err(|error| error.to_string())?;
+
+        let nodes = symbol_stmt
+            .query_map([max_symbols as i64], |row| {
+                let id: String = row.get(0)?;
+                Ok(json!({
+                    "id": id,
+                    "name": row.get::<_, String>(1)?,
+                    "qualified_name": row.get::<_, String>(2)?,
+                    "kind": row.get::<_, String>(3)?,
+                    "file_path": row.get::<_, String>(4)?,
+                    "line": row.get::<_, u32>(5)?,
+                    "column": row.get::<_, u32>(6)?,
+                    "visibility": row.get::<_, String>(7)?,
+                    "source": row.get::<_, String>(8)?,
+                    "incoming_count": row.get::<_, i64>(9)?,
+                    "outgoing_count": row.get::<_, i64>(10)?,
+                    "degree": row.get::<_, i64>(11)?,
+                }))
+            })
+            .map_err(|error| error.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| error.to_string())?;
+
+        let selected_ids = nodes
+            .iter()
+            .filter_map(|node| node["id"].as_str().map(ToOwned::to_owned))
+            .collect::<HashSet<_>>();
+
+        let mut edges = Vec::new();
+        if !selected_ids.is_empty() && max_edges > 0 {
+            let mut edge_stmt = conn
+                .prepare(
+                    "SELECT
+                        d.from_symbol,
+                        d.to_symbol,
+                        COUNT(*) AS weight,
+                        GROUP_CONCAT(DISTINCT d.kind) AS kinds
+                    FROM dependencies d
+                    JOIN symbols source_symbol ON source_symbol.id = d.from_symbol
+                    JOIN symbols target_symbol ON target_symbol.id = d.to_symbol
+                    WHERE source_symbol.source = 'local'
+                      AND target_symbol.source = 'local'
+                    GROUP BY d.from_symbol, d.to_symbol
+                    ORDER BY weight DESC, d.from_symbol ASC, d.to_symbol ASC",
+                )
+                .map_err(|error| error.to_string())?;
+
+            let edge_rows = edge_stmt
+                .query_map([], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, i64>(2)?,
+                        row.get::<_, Option<String>>(3)?,
+                    ))
+                })
+                .map_err(|error| error.to_string())?;
+
+            for edge in edge_rows {
+                let (source, target, weight, kinds) = edge.map_err(|error| error.to_string())?;
+                if !selected_ids.contains(&source) || !selected_ids.contains(&target) {
+                    continue;
+                }
+
+                edges.push(json!({
+                    "id": format!("{source}->{target}"),
+                    "source": source,
+                    "target": target,
+                    "weight": weight,
+                    "kinds": kinds
+                        .unwrap_or_default()
+                        .split(',')
+                        .filter(|kind| !kind.is_empty())
+                        .collect::<Vec<_>>(),
+                }));
+
+                if edges.len() >= max_edges {
+                    break;
+                }
+            }
+        }
+
+        let displayed_symbols = nodes.len();
+        let hidden_symbols = total_symbols.saturating_sub(displayed_symbols as i64);
+
+        Ok(json!({
+            "total_symbols": total_symbols,
+            "total_edges": total_edges,
+            "displayed_symbols": displayed_symbols,
+            "displayed_edges": edges.len(),
+            "hidden_symbols": hidden_symbols,
+            "max_symbols": max_symbols,
+            "max_edges": max_edges,
+            "nodes": nodes,
+            "edges": edges,
+        }))
     }
 
     fn parse_task_context_mode(mode: Option<&str>) -> McpResult<TaskContextMode> {
@@ -4546,6 +4751,17 @@ impl QuickDepServer {
         Parameters(request): Parameters<ProjectStatusRequest>,
     ) -> McpResult<Json<Value>> {
         Ok(Json(self.get_scan_status_value(request).await?))
+    }
+
+    /// Summarize the project-level dependency graph for visualization.
+    #[tool(
+        description = "Summarize the highest-degree local interfaces and dependencies in a project"
+    )]
+    pub async fn get_project_overview(
+        &self,
+        Parameters(request): Parameters<ProjectOverviewRequest>,
+    ) -> McpResult<Json<Value>> {
+        Ok(Json(self.get_project_overview_value(request).await?))
     }
 
     /// Request cancellation of an ongoing scan.
