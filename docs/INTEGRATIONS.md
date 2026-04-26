@@ -28,7 +28,7 @@ quickdep serve
 
 | 路径 | 状态 | 验证方式 |
 | --- | --- | --- |
-| `cargo install --path .` | 已验证可用 | 实测安装成功，`quickdep --version` 返回 `0.1.0` |
+| `cargo install --path .` | 已验证可用 | 实测安装成功，`quickdep --version` 返回 `0.1.1` |
 | `quickdep install-mcp claude` | 已验证可用 | `claude mcp list` 显示 QuickDep 已连接 |
 | `quickdep install-mcp codex` | 已验证可用 | `codex mcp list` 可见 QuickDep |
 | `quickdep install-mcp opencode` | 已验证可用 | `opencode mcp list` 显示 QuickDep 已连接 |

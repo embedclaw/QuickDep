@@ -161,7 +161,7 @@ As of `2026-04-24`, the verified working path is source install plus `install-mc
 
 | Method | Current status | Verification result |
 | --- | --- | --- |
-| `cargo install --path .` | Available | Installed successfully and `quickdep --version` returned `0.1.0` |
+| `cargo install --path .` | Available | Installed successfully and `quickdep --version` returned `0.1.1` |
 | `quickdep install-mcp claude` | Available | Verified and visible in `claude mcp list` |
 | `quickdep install-mcp codex` | Available | Verified and visible in `codex mcp list` |
 | `quickdep install-mcp opencode` | Available | Verified and visible in `opencode mcp list` |
