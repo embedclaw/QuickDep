@@ -2,7 +2,7 @@
 
 ## 1. 目标
 
-QuickDep 的推荐运行形态是本地 `stdio MCP` 代理服务：
+QuickDep 的推荐运行形态是本地 `stdio MCP` 服务：
 
 ```bash
 quickdep serve
@@ -18,7 +18,6 @@ quickdep serve
 
 - QuickDep 需要直接访问本机仓库
 - 需要在本地创建 `.quickdep/` 数据和 watcher
-- `serve` 只是代理入口，真正的项目状态由本地 daemon 统一持有
 - 不需要额外部署远程服务
 
 ---
@@ -29,15 +28,20 @@ quickdep serve
 
 | 路径 | 状态 | 验证方式 |
 | --- | --- | --- |
-| `cargo install --path .` | 已验证可用 | 实测安装成功，`quickdep --version` 返回 `0.1.2` |
+| `cargo install --path .` | 已验证可用 | 适合本地源码安装；`quickdep --version` 会反映当前检出的分支版本 |
 | `quickdep install-mcp claude` | 已验证可用 | `claude mcp list` 显示 QuickDep 已连接 |
 | `quickdep install-mcp codex` | 已验证可用 | `codex mcp list` 可见 QuickDep |
 | `quickdep install-mcp opencode` | 已验证可用 | `opencode mcp list` 显示 QuickDep 已连接 |
-| GitHub Releases | tag 驱动发布 | 推送 `v0.1.2` 到 `embedclaw/QuickDep` 后自动构建并发布 |
-| Homebrew | 工作流已就绪 | 是否真正发布取决于 release workflow 中的 tap 凭证 |
-| npm 包装器 | 工作流已就绪 | 是否真正发布取决于 release workflow 中的 `NPM_TOKEN` |
+| GitHub Releases | 已公开发布 | `embedclaw/QuickDep` 已有公开 Release，当前最新公开版本是 `v0.1.3` |
+| Homebrew | 尚未发布 | tap / formula 还没有公开可用 |
+| npm 包装器 | 尚未发布 | `npm view @embedclaw/quickdep` 当前返回 `E404` |
 
-所以今天如果要真正装起来，应该直接用源码安装：
+所以今天如果要真正装起来，公开安装方式优先级应该是：
+
+1. GitHub Release
+2. 源码安装
+
+如果你当前就在仓库内开发，或者希望安装当前检出的工作分支版本，直接用源码安装：
 
 ```bash
 cargo install --path .
@@ -184,12 +188,14 @@ Use the `quickdep` MCP server for symbol lookup, dependency tracing, and cross-f
 
 ### 6.1 GitHub Releases
 
-发布工作流已经配置好；在仓库打 `v*` tag 后，会构建以下产物并上传到 GitHub Release。
+发布工作流已经配置好，并且仓库已经有公开 GitHub Release。后续在仓库打 `v*` tag 时，会继续构建并上传以下产物。
 
 Release 产物统一命名：
 
 - `quickdep-darwin-aarch64.tar.gz`
+- `quickdep-darwin-x86_64.tar.gz`
 - `quickdep-linux-x86_64.tar.gz`
+- `quickdep-linux-aarch64.tar.gz`
 - `quickdep-windows-x86_64.zip`
 - `checksums.txt`
 
@@ -210,7 +216,7 @@ brew install embedclaw/tap/quickdep
 npm 只作为二进制包装器，目标命令如下：
 
 ```bash
-npm i -g @northcipher/quickdep
+npm i -g @embedclaw/quickdep
 ```
 
 包装脚本已经在仓库中准备好，但 npm registry 当前还没有公开发布。发布后，安装脚本会根据平台下载对应的 GitHub Release 产物，并把 `quickdep` 放到包内 `bin` 目录下。

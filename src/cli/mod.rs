@@ -20,7 +20,10 @@ pub async fn run_scan(path: &Path, rebuild: bool) -> anyhow::Result<Value> {
 
 /// Run the `status` command.
 pub async fn run_status(path: &Path) -> anyhow::Result<Value> {
-    DaemonClient::connect_or_start().await?.cli_status(path).await
+    DaemonClient::connect_or_start()
+        .await?
+        .cli_status(path)
+        .await
 }
 
 /// Run the `debug` command.

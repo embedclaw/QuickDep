@@ -1,6 +1,6 @@
 {
-  "name": "@northcipher/quickdep",
-  "version": "0.1.2",
+  "name": "@embedclaw/quickdep",
+  "version": "0.1.3",
   "description": "Binary wrapper for QuickDep",
   "license": "MIT",
   "repository": {

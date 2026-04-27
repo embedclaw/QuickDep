@@ -231,7 +231,7 @@ async fn main() -> anyhow::Result<()> {
                 let output = daemon::stop_daemon().await?;
                 println!("{}", serde_json::to_string_pretty(&output)?);
             }
-        }
+        },
 
         Commands::Debug {
             path,

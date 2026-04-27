@@ -19,7 +19,7 @@ Instead of making Claude, Codex, or your own tooling grep a large codebase blind
 - What is the shortest call path between two symbols?
 - Which file owns these related declarations?
 
-It runs locally, persists graph data in SQLite, keeps a single shared daemon warm across frontends, and exposes the result through MCP, HTTP, WebSocket, and a local web UI.
+It runs locally, persists graph data in SQLite, updates incrementally, and exposes the result through MCP, HTTP, WebSocket, and a local web UI.
 QuickDep is MIT licensed and designed for real coding workflows where agents need to find the right files before they can reason correctly.
 
 ## Web UI
@@ -32,7 +32,7 @@ The right side is visual: project-level relation cloud, symbol-level dependency 
 
 ### Start the web UI
 
-1. Ask the daemon to ensure a local HTTP endpoint:
+1. Start QuickDep with HTTP enabled:
 
    ```bash
    quickdep --http 8080 --http-only
@@ -60,7 +60,7 @@ The right side is visual: project-level relation cloud, symbol-level dependency 
 8. Use the `+`, `-`, and `Reset` controls in the bottom-right corner to zoom and recenter
 
 The browser UI does not require editing `quickdep.toml`.
-It talks to the same daemon-backed local QuickDep HTTP service that MCP clients and API consumers use.
+It talks to the same local QuickDep HTTP service that MCP clients and API consumers use.
 
 ## The Question QuickDep Answers Better Than grep
 
@@ -141,8 +141,38 @@ The current evidence-backed guidance is more specific than "always use QuickDep 
 1. Use QuickDep first for cross-file workflow, impact, call-chain, no-anchor triage, and editor-context questions
 2. Pair QuickDep with a small amount of native code reading when behavior details matter
 3. Treat single-symbol boundary questions differently: native tools are still competitive or better there today, while QuickDep mainly helps by reducing blind raw-code reading
+4. Treat dead-code and deletion questions as a verification workflow: QuickDep can surface "no static callers found" candidates, and `get_verification_context` can package the next checks, but it is not a standalone deletion judge
 
 That is what the completed rerun currently supports. The benchmark does not support the stronger claim that QuickDep already makes every question faster or better.
+
+## What QuickDep Does Not Decide Alone
+
+QuickDep is strongest when the question is:
+
+- what should I inspect first
+- what depends on this symbol
+- what is the likely impact surface
+- which files are structurally related
+
+It is not enough on its own for questions like:
+
+- can I safely delete this symbol
+- is this definitely dead code
+- does runtime behavior prove this path is unused
+
+Why not:
+
+- QuickDep's strongest evidence is still static structure
+- many real projects rely on dynamic registration, framework conventions, event wiring, or string-based dispatch
+- `incoming = 0` means "no static callers found", not "safe to delete"
+
+For deletion or dead-code cleanup, the safe workflow is:
+
+1. Use QuickDep to narrow the candidate set
+2. Use `get_verification_context` on the suspicious symbol to inspect `assessment`, `dynamic_risk`, `verification_hints`, and related files
+3. Use text search to catch non-graph references
+4. Read the small number of likely files
+5. Confirm with tests or compilation before removing code
 
 ## QuickDep vs Common Alternatives
 
@@ -157,19 +187,19 @@ QuickDep is built specifically for local MCP agents that need dependency and cal
 
 ## Install And Connect
 
-As of `2026-04-24`, the verified working path is source install plus `install-mcp`. The public release channels are prepared in the repo, but they are not published yet.
+As of `2026-04-27`, the verified install picture is:
 
 | Method | Current status | Verification result |
 | --- | --- | --- |
-| `cargo install --path .` | Available | Installed successfully and `quickdep --version` returned `0.1.2` |
+| `cargo install --path .` | Available | Works for local source installs; `quickdep --version` reflects the checked-out branch version |
 | `quickdep install-mcp claude` | Available | Verified and visible in `claude mcp list` |
 | `quickdep install-mcp codex` | Available | Verified and visible in `codex mcp list` |
 | `quickdep install-mcp opencode` | Available | Verified and visible in `opencode mcp list` |
-| GitHub Release | Tag-triggered publish | Pushing `v0.1.2` to `embedclaw/QuickDep` starts the release workflow |
-| Homebrew | Workflow-ready | Formula publish depends on tap credentials in the release workflow |
-| npm | Workflow-ready | npm publish depends on `NPM_TOKEN` in the release workflow |
+| GitHub Release | Published | Public releases are available on `embedclaw/QuickDep`; latest public release is `v0.1.3` |
+| Homebrew | Not published | Tap / formula are not publicly available yet |
+| npm | Not published | `npm view @embedclaw/quickdep` currently returns `E404` |
 
-If you want a working install today:
+If you want the lowest-friction path today, prefer the GitHub Release first. If you are developing locally or want the checked-out branch build:
 
 ```bash
 cargo install --path .
@@ -188,7 +218,7 @@ If you want Claude Code, Codex, or OpenCode to do the install for you, use this 
 
 - [docs/AGENT_INSTALL_PROMPT.md](docs/AGENT_INSTALL_PROMPT.md)
 
-Verify that the daemon-backed local service is alive:
+Verify that the local service is alive:
 
 ```bash
 # terminal 1
@@ -205,25 +235,17 @@ More distribution and integration details:
 
 ## 30-Second Start and Verify
 
-QuickDep defaults to `serve`, so `quickdep` starts a local stdio MCP proxy immediately. The proxy talks to a shared background daemon:
+QuickDep defaults to `serve`, so `quickdep` starts the local stdio MCP server immediately:
 
 ```bash
 # Start local stdio MCP in the current workspace
 quickdep
 
-# Start MCP stdio + daemon-backed HTTP on localhost:8080
+# Start MCP stdio + HTTP on localhost:8080
 quickdep --http 8080
 
-# Ensure HTTP only, then return
+# HTTP only
 quickdep --http 8080 --http-only
-```
-
-Daemon management commands:
-
-```bash
-quickdep daemon
-quickdep daemon status
-quickdep daemon stop
 ```
 
 If you want a fast health check before wiring it into an MCP client:
@@ -257,6 +279,7 @@ The HTTP server exposes:
 | What does this symbol depend on? | `get_dependencies` with `outgoing` |
 | How do `entry` and `helper` connect? | `get_call_chain` |
 | What interfaces live in one file? | `get_file_interfaces` |
+| Is this really a cleanup candidate? | `get_verification_context` |
 | Can I browse this visually? | local web UI in [`web/`](web) |
 
 ## What Ships Today
@@ -264,7 +287,7 @@ The HTTP server exposes:
 - Tree-sitter parsers for Rust, TypeScript/JavaScript, Java, C#, Kotlin, PHP, Ruby, Swift, Objective-C, Python, Go, C, and C++
 - SQLite-backed graph storage with WAL mode and FTS5-backed symbol search
 - Incremental scanning with file watching, debounce, and pause/resume behavior
-- MCP server with project, symbol, dependency, and call-chain tools
+- MCP server with project, symbol, dependency, call-chain, and verification-oriented evidence tools
 - HTTP API plus WebSocket status streaming
 - Local web UI for project state, search, graph view, tables, and batch queries
 - Agent installers for Claude Code, Codex, and OpenCode

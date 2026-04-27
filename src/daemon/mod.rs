@@ -239,11 +239,9 @@ impl DaemonClient {
         if envelope.ok {
             Ok(envelope.value.unwrap_or(Value::Null))
         } else {
-            Err(anyhow!(
-                envelope
-                    .error
-                    .unwrap_or_else(|| "daemon request failed".to_string())
-            ))
+            Err(anyhow!(envelope
+                .error
+                .unwrap_or_else(|| "daemon request failed".to_string())))
         }
     }
 
@@ -370,12 +368,7 @@ impl DaemonRuntime {
                 file,
             } => {
                 self.cli_runtime
-                    .debug_project(
-                        Path::new(&path),
-                        stats,
-                        deps.as_deref(),
-                        file.as_deref(),
-                    )
+                    .debug_project(Path::new(&path), stats, deps.as_deref(), file.as_deref())
                     .await
             }
             DaemonRequest::ToolCall {
@@ -460,7 +453,10 @@ async fn dispatch_tool_call(
         "list_projects" => Ok(server.list_projects().await?.0),
         "scan_project" => {
             let request = from_value::<ScanProjectRequest>(arguments)?;
-            Ok(server.scan_project(rmcp::handler::server::wrapper::Parameters(request)).await?.0)
+            Ok(server
+                .scan_project(rmcp::handler::server::wrapper::Parameters(request))
+                .await?
+                .0)
         }
         "get_scan_status" => {
             let request = from_value::<ProjectStatusRequest>(arguments)?;
@@ -478,7 +474,10 @@ async fn dispatch_tool_call(
         }
         "cancel_scan" => {
             let request = from_value::<ProjectStatusRequest>(arguments)?;
-            Ok(server.cancel_scan(rmcp::handler::server::wrapper::Parameters(request)).await?.0)
+            Ok(server
+                .cancel_scan(rmcp::handler::server::wrapper::Parameters(request))
+                .await?
+                .0)
         }
         "find_interfaces" => {
             let request = from_value::<FindInterfacesRequest>(arguments)?;
@@ -552,7 +551,10 @@ async fn dispatch_tool_call(
         }
         "batch_query" => {
             let request = from_value::<BatchQueryRequest>(arguments)?;
-            Ok(server.batch_query(rmcp::handler::server::wrapper::Parameters(request)).await?.0)
+            Ok(server
+                .batch_query(rmcp::handler::server::wrapper::Parameters(request))
+                .await?
+                .0)
         }
         "rebuild_database" => {
             let request = from_value::<ProjectStatusRequest>(arguments)?;
@@ -727,7 +729,10 @@ mod transport {
     use tokio::net::{UnixListener, UnixStream};
 
     pub fn endpoint() -> anyhow::Result<String> {
-        Ok(daemon_state_dir()?.join("daemon.sock").display().to_string())
+        Ok(daemon_state_dir()?
+            .join("daemon.sock")
+            .display()
+            .to_string())
     }
 
     pub async fn remove_endpoint_if_exists(endpoint: &str) -> anyhow::Result<()> {
@@ -803,7 +808,10 @@ mod transport {
         Ok(())
     }
 
-    async fn exchange(stream: UnixStream, request: &DaemonRequest) -> anyhow::Result<DaemonEnvelope> {
+    async fn exchange(
+        stream: UnixStream,
+        request: &DaemonRequest,
+    ) -> anyhow::Result<DaemonEnvelope> {
         let (reader, mut writer) = stream.into_split();
         writer
             .write_all(format!("{}\n", serde_json::to_string(request)?).as_bytes())
@@ -898,7 +906,10 @@ mod transport {
         Ok(())
     }
 
-    async fn exchange(stream: TcpStream, request: &DaemonRequest) -> anyhow::Result<DaemonEnvelope> {
+    async fn exchange(
+        stream: TcpStream,
+        request: &DaemonRequest,
+    ) -> anyhow::Result<DaemonEnvelope> {
         let (reader, mut writer) = stream.into_split();
         writer
             .write_all(format!("{}\n", serde_json::to_string(request)?).as_bytes())

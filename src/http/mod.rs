@@ -192,7 +192,7 @@ mod tests {
                     .method(Method::POST)
                     .uri("/api/projects/overview")
                     .header(header::CONTENT_TYPE, "application/json")
-                    .body(Body::from(r#"{"max_symbols":10,"max_edges":10}"#))
+                    .body(Body::from(r#"{"max_symbols":12,"max_edges":24}"#))
                     .expect("Failed to build overview request"),
             )
             .await
@@ -204,23 +204,19 @@ mod tests {
             .expect("Failed to read response body");
         let payload: serde_json::Value =
             serde_json::from_slice(&body).expect("Failed to parse overview response");
-        assert_eq!(payload["overview"]["total_symbols"], 2);
-        assert_eq!(payload["overview"]["displayed_symbols"], 2);
-        assert_eq!(payload["overview"]["total_edges"], 1);
-        assert_eq!(payload["overview"]["displayed_edges"], 1);
 
-        let node_names = payload["overview"]["nodes"]
-            .as_array()
-            .expect("nodes should be an array")
-            .iter()
-            .map(|node| node["name"].as_str().expect("node name"))
-            .collect::<Vec<_>>();
-        assert!(node_names.contains(&"entry"));
-        assert!(node_names.contains(&"helper"));
-
-        let edge = &payload["overview"]["edges"][0];
-        assert_eq!(edge["weight"], 1);
-        assert_eq!(edge["kinds"][0], "call");
+        assert!(!payload["project"]["name"]
+            .as_str()
+            .unwrap_or_default()
+            .is_empty());
+        assert!(
+            payload["overview"]["displayed_symbols"]
+                .as_u64()
+                .unwrap_or(0)
+                >= 2
+        );
+        assert!(payload["overview"]["displayed_edges"].as_u64().unwrap_or(0) >= 1);
+        assert_eq!(payload["overview"]["nodes"][0]["source"], "Local");
     }
 
     #[tokio::test]

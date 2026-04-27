@@ -386,6 +386,23 @@ impl Storage {
         Ok(result)
     }
 
+    /// Get every symbol currently stored in the database.
+    ///
+    /// # Returns
+    /// A full list of symbols ordered by file path and source location.
+    pub fn get_all_symbols(&self) -> Result<Vec<Symbol>, StorageError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, name, qualified_name, kind, file_path, line, column,
+             visibility, signature, source
+             FROM symbols
+             ORDER BY file_path, line, column, name",
+        )?;
+        let symbols = stmt
+            .query_map([], row_to_symbol)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(symbols)
+    }
+
     /// Get all symbols in a file
     ///
     /// # Arguments
@@ -639,6 +656,22 @@ impl Storage {
         )?;
         let deps = stmt
             .query_map([symbol_id], row_to_dependency)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(deps)
+    }
+
+    /// Get every dependency currently stored in the database.
+    ///
+    /// # Returns
+    /// A full list of dependencies ordered by source file and line number.
+    pub fn get_all_dependencies(&self) -> Result<Vec<Dependency>, StorageError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, from_symbol, to_symbol, from_file, from_line, kind
+             FROM dependencies
+             ORDER BY from_file, from_line, from_symbol, to_symbol",
+        )?;
+        let deps = stmt
+            .query_map([], row_to_dependency)?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(deps)
     }

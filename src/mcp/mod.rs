@@ -20,7 +20,7 @@ use rmcp::{
     schemars::JsonSchema,
     tool, tool_handler, tool_router, ErrorData as McpError, Json, ServerHandler, ServiceExt,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{json, Value};
 use tokio::{sync::mpsc, task::spawn_blocking};
 use tracing::{debug, info, warn};
@@ -30,7 +30,7 @@ use rmcp::schemars;
 use crate::{
     cache::{QueryCache, SymbolIndexCache},
     config::{load_settings, Settings},
-    core::Symbol,
+    core::{Symbol, SymbolKind, SymbolSource, Visibility},
     daemon::DaemonClient,
     project::{
         get_manifest_path, ManagerError, Project, ProjectConfig, ProjectId, ProjectManager,
@@ -43,10 +43,10 @@ use crate::{
 
 const DEFAULT_SEARCH_LIMIT: usize = 20;
 const DEFAULT_DEPENDENCY_DEPTH: u32 = 3;
-const DEFAULT_OVERVIEW_SYMBOL_LIMIT: usize = 80;
-const DEFAULT_OVERVIEW_EDGE_LIMIT: usize = 160;
-const MAX_OVERVIEW_SYMBOL_LIMIT: usize = 500;
-const MAX_OVERVIEW_EDGE_LIMIT: usize = 1_000;
+const DEFAULT_PROJECT_OVERVIEW_SYMBOL_LIMIT: usize = 120;
+const MAX_PROJECT_OVERVIEW_SYMBOL_LIMIT: usize = 240;
+const DEFAULT_PROJECT_OVERVIEW_EDGE_LIMIT: usize = 260;
+const MAX_PROJECT_OVERVIEW_EDGE_LIMIT: usize = 640;
 const DEFAULT_CONTEXT_SYMBOL_LIMIT: usize = 5;
 const DEFAULT_CONTEXT_FILE_LIMIT: usize = 5;
 const DEFAULT_CONTEXT_EXPANSIONS: u32 = 1;
@@ -56,6 +56,44 @@ const IDLE_CHECK_INTERVAL: Duration = Duration::from_secs(30);
 const WATCH_DEBOUNCE_DELAY: Duration = Duration::from_millis(500);
 const PROJECT_LOAD_WAIT_TIMEOUT: Duration = Duration::from_secs(10);
 const PROJECT_LOAD_WAIT_POLL_INTERVAL: Duration = Duration::from_millis(25);
+const TEST_PATH_TERMS: &[&str] = &[
+    "/tests/",
+    "/test/",
+    "__tests__",
+    "/fixtures/",
+    "/mocks/",
+    ".spec.",
+    ".test.",
+    "_test.",
+];
+const HIGH_DYNAMIC_RISK_TERMS: &[&str] = &[
+    "handler",
+    "handlers",
+    "route",
+    "routes",
+    "router",
+    "registry",
+    "register",
+    "command",
+    "commands",
+    "event",
+    "events",
+    "listener",
+    "subscriber",
+    "plugin",
+    "plugins",
+    "hook",
+    "hooks",
+    "store",
+    "stores",
+    "pinia",
+    "dispatch",
+    "emitter",
+    "bus",
+];
+const MEDIUM_DYNAMIC_RISK_TERMS: &[&str] = &[
+    "factory", "provider", "adapter", "bridge", "service", "worker",
+];
 
 const WORKFLOW_STATUS_TERMS: &[&str] = &[
     "queued",
@@ -162,10 +200,19 @@ const WORKFLOW_QUEUE_PRIORITY_TERMS: &[&str] = &["next_conflict_queue_head", "qu
 const WORKFLOW_SCHEDULER_PRIORITY_TERMS: &[&str] = &["admit", "dispatchable_head"];
 
 type McpResult<T> = Result<T, McpError>;
-type ToolRouterBuild = (ToolRouter<QuickDepServer>, HashSet<String>, Option<Vec<String>>);
+type ToolRouterBuild = (
+    ToolRouter<QuickDepServer>,
+    HashSet<String>,
+    Option<Vec<String>>,
+);
 
 /// Shared project selector used by MCP tools.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+///
+/// Accepts either:
+/// - `{ "project_id": "..." }`
+/// - `{ "path": "/absolute/path" }`
+/// - a bare string path like `"/absolute/path"`
+#[derive(Debug, Clone, Default, Serialize, JsonSchema)]
 pub struct ProjectTarget {
     /// Registered project ID.
     #[serde(default)]
@@ -173,6 +220,33 @@ pub struct ProjectTarget {
     /// Project root path. When omitted, the server workspace is used.
     #[serde(default)]
     pub path: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum ProjectTargetRepr {
+    Path(String),
+    Object {
+        #[serde(default)]
+        project_id: Option<String>,
+        #[serde(default)]
+        path: Option<String>,
+    },
+}
+
+impl<'de> Deserialize<'de> for ProjectTarget {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match ProjectTargetRepr::deserialize(deserializer)? {
+            ProjectTargetRepr::Path(path) => Ok(Self {
+                project_id: None,
+                path: Some(path),
+            }),
+            ProjectTargetRepr::Object { project_id, path } => Ok(Self { project_id, path }),
+        }
+    }
 }
 
 /// Parameters for `scan_project`.
@@ -194,20 +268,6 @@ pub struct ProjectStatusRequest {
     pub project: ProjectTarget,
 }
 
-/// Parameters for `get_project_overview`.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct ProjectOverviewRequest {
-    /// Target project.
-    #[serde(default)]
-    pub project: ProjectTarget,
-    /// Maximum number of graph nodes to return.
-    #[serde(default)]
-    pub max_symbols: Option<usize>,
-    /// Maximum number of graph edges to return.
-    #[serde(default)]
-    pub max_edges: Option<usize>,
-}
-
 /// Parameters for `find_interfaces`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct FindInterfacesRequest {
@@ -224,6 +284,16 @@ pub struct FindInterfacesRequest {
 /// Parameters for interface lookup tools.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct InterfaceLookupRequest {
+    /// Target project.
+    #[serde(default)]
+    pub project: ProjectTarget,
+    /// Symbol ID, qualified name, or exact symbol name.
+    pub interface: String,
+}
+
+/// Parameters for `get_verification_context`.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct VerificationContextRequest {
     /// Target project.
     #[serde(default)]
     pub project: ProjectTarget,
@@ -270,6 +340,20 @@ pub struct FileInterfacesRequest {
     pub project: ProjectTarget,
     /// File path relative to the project root.
     pub file_path: String,
+}
+
+/// Parameters for `get_project_overview`.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ProjectOverviewRequest {
+    /// Target project.
+    #[serde(default)]
+    pub project: ProjectTarget,
+    /// Maximum number of interface nodes to render in the overview cloud.
+    #[serde(default)]
+    pub max_symbols: Option<usize>,
+    /// Maximum number of direct dependency edges to render in the overview cloud.
+    #[serde(default)]
+    pub max_edges: Option<usize>,
 }
 
 /// Workspace-local context supplied by an agent UI.
@@ -397,6 +481,44 @@ struct ProjectRecord {
     path: String,
     state: ProjectState,
     is_default: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct ProjectOverviewNode {
+    id: String,
+    name: String,
+    qualified_name: String,
+    kind: crate::core::SymbolKind,
+    file_path: String,
+    line: u32,
+    column: u32,
+    visibility: crate::core::Visibility,
+    source: crate::core::SymbolSource,
+    incoming_count: usize,
+    outgoing_count: usize,
+    degree: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct ProjectOverviewEdge {
+    id: String,
+    source: String,
+    target: String,
+    weight: usize,
+    kinds: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct ProjectOverviewPayload {
+    total_symbols: usize,
+    total_edges: usize,
+    displayed_symbols: usize,
+    displayed_edges: usize,
+    hidden_symbols: usize,
+    max_symbols: usize,
+    max_edges: usize,
+    nodes: Vec<ProjectOverviewNode>,
+    edges: Vec<ProjectOverviewEdge>,
 }
 
 #[derive(Debug)]
@@ -886,9 +1008,7 @@ impl QuickDepServer {
         Ok(())
     }
 
-    fn build_tool_router(
-        allowed_tools: Option<&[String]>,
-    ) -> anyhow::Result<ToolRouterBuild> {
+    fn build_tool_router(allowed_tools: Option<&[String]>) -> anyhow::Result<ToolRouterBuild> {
         let mut tool_router = Self::tool_router();
         let available_tools = tool_router
             .list_all()
@@ -1448,18 +1568,9 @@ impl QuickDepServer {
     }
 
     fn all_symbols(storage: &Storage) -> Result<Vec<Symbol>, String> {
-        let mut symbols = Vec::new();
-        for file_state in storage
-            .get_all_file_states()
-            .map_err(Self::storage_error_message)?
-        {
-            symbols.extend(
-                storage
-                    .get_symbols_by_file(&file_state.path)
-                    .map_err(Self::storage_error_message)?,
-            );
-        }
-        Ok(symbols)
+        storage
+            .get_all_symbols()
+            .map_err(Self::storage_error_message)
     }
 
     fn resolve_symbol_from_storage(
@@ -1519,10 +1630,31 @@ impl QuickDepServer {
     }
 
     async fn list_projects_value(&self) -> McpResult<Value> {
+        let removed = self
+            .manager
+            .prune_missing_projects()
+            .await
+            .map_err(Self::manager_error)?;
+        if !removed.is_empty() {
+            warn!(
+                removed_count = removed.len(),
+                "pruned stale projects before listing registered projects"
+            );
+        }
+
         let manifest = self.manager.get_manifest().await;
         let mut projects = Vec::new();
 
         for entry in manifest.projects {
+            if !Path::new(&entry.path).exists() {
+                warn!(
+                    project_id = %entry.id,
+                    path = %entry.path,
+                    "skipping stale manifest entry for missing project path"
+                );
+                continue;
+            }
+
             projects.push(
                 serde_json::to_value(self.project_record(&entry.id).await?)
                     .map_err(Self::serialization_error)?,
@@ -1590,35 +1722,6 @@ impl QuickDepServer {
         }))
     }
 
-    async fn get_project_overview_value(
-        &self,
-        request: ProjectOverviewRequest,
-    ) -> McpResult<Value> {
-        let max_symbols = request.max_symbols.unwrap_or(DEFAULT_OVERVIEW_SYMBOL_LIMIT);
-        let max_edges = request.max_edges.unwrap_or(DEFAULT_OVERVIEW_EDGE_LIMIT);
-
-        if max_symbols == 0 || max_edges == 0 {
-            return Err(Self::invalid_params(
-                "max_symbols and max_edges must be greater than 0",
-            ));
-        }
-
-        let max_symbols = max_symbols.min(MAX_OVERVIEW_SYMBOL_LIMIT);
-        let max_edges = max_edges.min(MAX_OVERVIEW_EDGE_LIMIT);
-        let project = self.ensure_project_loaded(&request.project).await?;
-        let project_record = self.project_record(&project.id).await?;
-
-        let overview = Self::blocking_storage(project.database_path(), move |storage| {
-            Self::build_project_overview(&storage, max_symbols, max_edges)
-        })
-        .await?;
-
-        Ok(json!({
-            "project": project_record,
-            "overview": overview,
-        }))
-    }
-
     async fn find_interfaces_value(&self, request: FindInterfacesRequest) -> McpResult<Value> {
         let query = request.query.trim().to_string();
         if query.is_empty() {
@@ -1670,6 +1773,9 @@ impl QuickDepServer {
                 "query": query_for_search,
                 "limit": limit,
                 "interfaces": interfaces,
+                "guidance": [
+                    "These are structural matches. Use get_interface, get_dependencies, or get_verification_context before making deletion decisions."
+                ],
             }))
         })
         .await?;
@@ -1699,8 +1805,11 @@ impl QuickDepServer {
                 &symbol_index.symbol_index,
                 &interface_key,
             )?;
+            let detail = Self::interface_detail_value(&storage, &symbol)?;
+            let evidence = detail.get("evidence").cloned().unwrap_or(Value::Null);
             Ok(json!({
-                "interface": symbol,
+                "interface": detail,
+                "evidence": evidence,
             }))
         })
         .await?;
@@ -1743,18 +1852,25 @@ impl QuickDepServer {
                 &symbol_index.symbol_index,
                 &interface_key,
             )?;
+            let detail = Self::interface_detail_value(&storage, &symbol)?;
+            let evidence = detail.get("evidence").cloned().unwrap_or(Value::Null);
 
             let response = match direction_key.as_str() {
                 "incoming" => json!({
-                    "interface": symbol,
+                    "interface": detail,
+                    "evidence": evidence,
                     "direction": "incoming",
                     "max_depth": max_depth,
                     "dependencies": storage
                         .get_dependency_chain_backward(&symbol.id, max_depth)
                         .map_err(Self::storage_error_message)?,
+                    "guidance": [
+                        "Static callers are evidence, not a deletion verdict. If incoming is 0, continue with text search and runtime-aware checks."
+                    ],
                 }),
                 "both" => json!({
-                    "interface": symbol,
+                    "interface": detail,
+                    "evidence": evidence,
                     "direction": "both",
                     "max_depth": max_depth,
                     "outgoing": storage
@@ -1763,14 +1879,21 @@ impl QuickDepServer {
                     "incoming": storage
                         .get_dependency_chain_backward(&symbol.id, max_depth)
                         .map_err(Self::storage_error_message)?,
+                    "guidance": [
+                        "Use direct callers and callees to narrow the review set, then verify dynamic wiring and run tests before removal."
+                    ],
                 }),
                 _ => json!({
-                    "interface": symbol,
+                    "interface": detail,
+                    "evidence": evidence,
                     "direction": "outgoing",
                     "max_depth": max_depth,
                     "dependencies": storage
                         .get_dependency_chain_forward(&symbol.id, max_depth)
                         .map_err(Self::storage_error_message)?,
+                    "guidance": [
+                        "Outgoing edges show downstream impact, but they do not prove the symbol is safe to delete."
+                    ],
                 }),
             };
 
@@ -1847,9 +1970,453 @@ impl QuickDepServer {
             Ok(json!({
                 "file_path": file_path_for_query,
                 "interfaces": interfaces,
+                "guidance": [
+                    "These are file-level summaries. Ask get_verification_context for one symbol when you need caller counts, dynamic-risk hints, or next validation steps."
+                ],
             }))
         })
         .await?;
+
+        cache.query_cache.insert(cache_key, result.clone());
+        Ok(result)
+    }
+
+    async fn get_verification_context_value(
+        &self,
+        request: VerificationContextRequest,
+    ) -> McpResult<Value> {
+        let interface = request.interface.trim().to_string();
+        if interface.is_empty() {
+            return Err(Self::invalid_params("interface cannot be empty"));
+        }
+
+        let project = self.ensure_project_loaded(&request.project).await?;
+        let cache = self.ensure_symbol_index_loaded(&project).await?;
+        let cache_key = format!("get_verification_context:{}", interface);
+        if let Some(cached) = cache.query_cache.get(&cache_key) {
+            return Ok(cached);
+        }
+
+        let symbol_index = cache.clone();
+        let interface_key = interface.clone();
+        let result = Self::blocking_storage(project.database_path(), move |storage| {
+            let symbol = Self::resolve_symbol_from_storage(
+                &storage,
+                &symbol_index.symbol_index,
+                &interface_key,
+            )?;
+            let detail = Self::interface_detail_value(&storage, &symbol)?;
+            let evidence = detail.get("evidence").cloned().unwrap_or(Value::Null);
+            let context = Self::load_symbol_context(
+                &storage,
+                &symbol,
+                TaskContextLimits {
+                    primary_symbols: 0,
+                    primary_files: 0,
+                    related_files: 6,
+                    direct_neighbors: 8,
+                    same_file_symbols: 4,
+                    source_snippets: 0,
+                    workflow_symbols: 0,
+                    workflow_depth: 0,
+                },
+            )?;
+
+            let direct_callers = context
+                .callers
+                .iter()
+                .map(Self::context_dependency_summary_value)
+                .collect::<Vec<_>>();
+            let direct_callees = context
+                .callees
+                .iter()
+                .map(Self::context_dependency_summary_value)
+                .collect::<Vec<_>>();
+            let same_file_interfaces = context
+                .same_file_symbols
+                .iter()
+                .map(Self::interface_summary_value)
+                .collect::<Vec<_>>();
+            let related_files = Self::related_files_value(
+                &symbol,
+                &direct_callers,
+                &direct_callees,
+                &same_file_interfaces,
+                6,
+            );
+            let suggested_reads = Self::suggested_reads_value(
+                &symbol,
+                &direct_callers,
+                &direct_callees,
+                &same_file_interfaces,
+            );
+            let search_terms = Self::verification_search_terms(&symbol);
+            let verification_plan = Self::verification_plan_value(
+                &symbol,
+                &evidence,
+                &search_terms,
+                !direct_callers.is_empty(),
+                !direct_callees.is_empty(),
+            );
+
+            Ok(json!({
+                "interface": detail,
+                "evidence": evidence,
+                "direct_callers": direct_callers,
+                "direct_callees": direct_callees,
+                "same_file_interfaces": same_file_interfaces,
+                "related_files": related_files,
+                "suggested_reads": suggested_reads,
+                "search_terms": search_terms,
+                "verification_plan": verification_plan,
+                "guidance": [
+                    "Use this package to narrow the review set, then verify dynamic references and run compile/tests before removal."
+                ],
+            }))
+        })
+        .await?;
+
+        cache.query_cache.insert(cache_key, result.clone());
+        Ok(result)
+    }
+
+    fn normalize_overview_relative_path(project_root: &Path, file_path: &str) -> String {
+        let candidate = Path::new(file_path);
+        let relative = if candidate.is_absolute() {
+            candidate.strip_prefix(project_root).unwrap_or(candidate)
+        } else {
+            candidate
+        };
+
+        relative.to_string_lossy().replace('\\', "/")
+    }
+
+    fn include_symbol_in_project_overview(
+        project_root: &Path,
+        config: &ProjectConfig,
+        symbol: &Symbol,
+    ) -> bool {
+        let relative_path = Self::normalize_overview_relative_path(project_root, &symbol.file_path);
+        if config
+            .exclude
+            .iter()
+            .any(|pattern| Self::matches_project_overview_exclude(pattern, &relative_path))
+        {
+            return false;
+        }
+
+        if !config.include_tests && Self::is_probably_test_file(&relative_path) {
+            return false;
+        }
+
+        true
+    }
+
+    fn matches_project_overview_exclude(pattern: &str, relative_path: &str) -> bool {
+        if glob_match::glob_match(pattern, relative_path) {
+            return true;
+        }
+
+        let Some(directory) = pattern.strip_suffix("/**") else {
+            return false;
+        };
+        if directory.contains('*') || directory.contains('?') || directory.contains('[') {
+            return false;
+        }
+
+        relative_path == directory
+            || relative_path.starts_with(&format!("{directory}/"))
+            || relative_path.contains(&format!("/{directory}/"))
+    }
+
+    fn build_project_overview_payload(
+        storage: &Storage,
+        project_root: &Path,
+        config: &ProjectConfig,
+        max_symbols: usize,
+        max_edges: usize,
+    ) -> Result<ProjectOverviewPayload, String> {
+        #[derive(Debug, Clone, Default)]
+        struct DegreeSummary {
+            incoming: usize,
+            outgoing: usize,
+        }
+
+        #[derive(Debug, Clone)]
+        struct RankedSymbol {
+            symbol: Symbol,
+            incoming: usize,
+            outgoing: usize,
+            degree: usize,
+        }
+
+        #[derive(Debug, Clone, Default)]
+        struct EdgeAggregate {
+            source: String,
+            target: String,
+            weight: usize,
+            kinds: HashSet<String>,
+        }
+
+        let local_symbols = Self::all_symbols(storage)?
+            .into_iter()
+            .filter(|symbol| matches!(symbol.source, SymbolSource::Local))
+            .filter(|symbol| Self::include_symbol_in_project_overview(project_root, config, symbol))
+            .collect::<Vec<_>>();
+        let symbol_by_id = local_symbols
+            .iter()
+            .cloned()
+            .map(|symbol| (symbol.id.clone(), symbol))
+            .collect::<HashMap<_, _>>();
+
+        let dependencies = storage
+            .get_all_dependencies()
+            .map_err(Self::storage_error_message)?;
+        let mut degree_by_symbol = HashMap::<String, DegreeSummary>::new();
+        let mut adjacency = HashMap::<String, HashMap<String, usize>>::new();
+        let mut edge_map = HashMap::<(String, String), EdgeAggregate>::new();
+
+        for dependency in dependencies {
+            if dependency.from_symbol == dependency.to_symbol {
+                continue;
+            }
+
+            if !symbol_by_id.contains_key(&dependency.from_symbol)
+                || !symbol_by_id.contains_key(&dependency.to_symbol)
+            {
+                continue;
+            }
+
+            degree_by_symbol
+                .entry(dependency.from_symbol.clone())
+                .or_default()
+                .outgoing += 1;
+            degree_by_symbol
+                .entry(dependency.to_symbol.clone())
+                .or_default()
+                .incoming += 1;
+
+            *adjacency
+                .entry(dependency.from_symbol.clone())
+                .or_default()
+                .entry(dependency.to_symbol.clone())
+                .or_default() += 1;
+            *adjacency
+                .entry(dependency.to_symbol.clone())
+                .or_default()
+                .entry(dependency.from_symbol.clone())
+                .or_default() += 1;
+
+            let edge_key = (dependency.from_symbol.clone(), dependency.to_symbol.clone());
+            let aggregate = edge_map
+                .entry(edge_key.clone())
+                .or_insert_with(|| EdgeAggregate {
+                    source: edge_key.0.clone(),
+                    target: edge_key.1.clone(),
+                    weight: 0,
+                    kinds: HashSet::new(),
+                });
+            aggregate.weight += 1;
+            aggregate.kinds.insert(dependency.kind.as_str().to_string());
+        }
+
+        let mut ranked_symbols = local_symbols
+            .into_iter()
+            .map(|symbol| {
+                let degree = degree_by_symbol
+                    .get(&symbol.id)
+                    .cloned()
+                    .unwrap_or_default();
+                RankedSymbol {
+                    degree: degree.incoming + degree.outgoing,
+                    incoming: degree.incoming,
+                    outgoing: degree.outgoing,
+                    symbol,
+                }
+            })
+            .collect::<Vec<_>>();
+        ranked_symbols.sort_by_key(|entry| {
+            (
+                std::cmp::Reverse(entry.degree),
+                std::cmp::Reverse(entry.outgoing),
+                std::cmp::Reverse(entry.incoming),
+                entry.symbol.name.clone(),
+                entry.symbol.qualified_name.clone(),
+            )
+        });
+
+        let rank_by_symbol = ranked_symbols
+            .iter()
+            .enumerate()
+            .map(|(index, entry)| (entry.symbol.id.clone(), index))
+            .collect::<HashMap<_, _>>();
+        let target_symbol_count = ranked_symbols.len().min(max_symbols);
+        let mut selected_ids = Vec::new();
+        let mut selected_set = HashSet::new();
+
+        for entry in &ranked_symbols {
+            if selected_ids.len() >= target_symbol_count {
+                break;
+            }
+
+            if selected_set.insert(entry.symbol.id.clone()) {
+                selected_ids.push(entry.symbol.id.clone());
+            }
+
+            if selected_ids.len() >= target_symbol_count {
+                break;
+            }
+
+            let mut neighbors = adjacency
+                .get(&entry.symbol.id)
+                .map(|neighbors| {
+                    neighbors
+                        .iter()
+                        .map(|(neighbor_id, weight)| {
+                            let neighbor_rank = rank_by_symbol
+                                .get(neighbor_id)
+                                .copied()
+                                .unwrap_or(usize::MAX);
+                            (neighbor_id.clone(), *weight, neighbor_rank)
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            neighbors.sort_by_key(|(neighbor_id, weight, neighbor_rank)| {
+                (
+                    std::cmp::Reverse(*weight),
+                    *neighbor_rank,
+                    neighbor_id.clone(),
+                )
+            });
+
+            for (neighbor_id, _, _) in neighbors {
+                if selected_ids.len() >= target_symbol_count {
+                    break;
+                }
+
+                if selected_set.insert(neighbor_id.clone()) {
+                    selected_ids.push(neighbor_id);
+                }
+            }
+        }
+
+        for entry in &ranked_symbols {
+            if selected_ids.len() >= target_symbol_count {
+                break;
+            }
+
+            if selected_set.insert(entry.symbol.id.clone()) {
+                selected_ids.push(entry.symbol.id.clone());
+            }
+        }
+
+        let mut nodes = ranked_symbols
+            .iter()
+            .filter(|entry| selected_set.contains(&entry.symbol.id))
+            .map(|entry| ProjectOverviewNode {
+                id: entry.symbol.id.clone(),
+                name: entry.symbol.name.clone(),
+                qualified_name: entry.symbol.qualified_name.clone(),
+                kind: entry.symbol.kind.clone(),
+                file_path: entry.symbol.file_path.clone(),
+                line: entry.symbol.line,
+                column: entry.symbol.column,
+                visibility: entry.symbol.visibility.clone(),
+                source: entry.symbol.source.clone(),
+                incoming_count: entry.incoming,
+                outgoing_count: entry.outgoing,
+                degree: entry.degree,
+            })
+            .collect::<Vec<_>>();
+        nodes.sort_by_key(|node| {
+            (
+                std::cmp::Reverse(node.degree),
+                std::cmp::Reverse(node.outgoing_count),
+                std::cmp::Reverse(node.incoming_count),
+                node.name.clone(),
+                node.qualified_name.clone(),
+            )
+        });
+
+        let total_edges = edge_map.len();
+        let mut edges = edge_map
+            .into_values()
+            .filter(|edge| {
+                selected_set.contains(&edge.source) && selected_set.contains(&edge.target)
+            })
+            .map(|edge| {
+                let mut kinds = edge.kinds.into_iter().collect::<Vec<_>>();
+                kinds.sort();
+                ProjectOverviewEdge {
+                    id: format!("{}->{}", edge.source, edge.target),
+                    source: edge.source,
+                    target: edge.target,
+                    weight: edge.weight,
+                    kinds,
+                }
+            })
+            .collect::<Vec<_>>();
+        edges.sort_by_key(|edge| {
+            (
+                std::cmp::Reverse(edge.weight),
+                edge.source.clone(),
+                edge.target.clone(),
+            )
+        });
+        if edges.len() > max_edges {
+            edges.truncate(max_edges);
+        }
+
+        Ok(ProjectOverviewPayload {
+            total_symbols: symbol_by_id.len(),
+            total_edges,
+            displayed_symbols: nodes.len(),
+            displayed_edges: edges.len(),
+            hidden_symbols: symbol_by_id.len().saturating_sub(nodes.len()),
+            max_symbols,
+            max_edges,
+            nodes,
+            edges,
+        })
+    }
+
+    async fn get_project_overview_value(
+        &self,
+        request: ProjectOverviewRequest,
+    ) -> McpResult<Value> {
+        let max_symbols = request
+            .max_symbols
+            .unwrap_or(DEFAULT_PROJECT_OVERVIEW_SYMBOL_LIMIT)
+            .clamp(24, MAX_PROJECT_OVERVIEW_SYMBOL_LIMIT);
+        let max_edges = request
+            .max_edges
+            .unwrap_or(DEFAULT_PROJECT_OVERVIEW_EDGE_LIMIT)
+            .clamp(24, MAX_PROJECT_OVERVIEW_EDGE_LIMIT);
+
+        let project = self.ensure_project_loaded(&request.project).await?;
+        let cache = self.project_cache(&project.id);
+        let cache_key = format!("get_project_overview:{max_symbols}:{max_edges}");
+        if let Some(cached) = cache.query_cache.get(&cache_key) {
+            return Ok(cached);
+        }
+
+        let project_root = project.path.clone();
+        let project_config = project.config.clone();
+        let payload = Self::blocking_storage(project.database_path(), move |storage| {
+            Self::build_project_overview_payload(
+                &storage,
+                &project_root,
+                &project_config,
+                max_symbols,
+                max_edges,
+            )
+        })
+        .await?;
+        let result = json!({
+            "project": self.project_record(&project.id).await?,
+            "overview": payload,
+        });
 
         cache.query_cache.insert(cache_key, result.clone());
         Ok(result)
@@ -2171,6 +2738,10 @@ impl QuickDepServer {
     }
 
     fn interface_summary_value(symbol: &Symbol) -> Value {
+        let exported = Self::symbol_is_exported(symbol);
+        let symbol_role = Self::classify_symbol_role(symbol, exported);
+        let (dynamic_risk, risk_factors) =
+            Self::estimate_dynamic_risk(symbol, exported, symbol_role);
         json!({
             "id": symbol.id,
             "name": symbol.name,
@@ -2181,167 +2752,414 @@ impl QuickDepServer {
             "column": symbol.column,
             "visibility": symbol.visibility,
             "source": symbol.source,
+            "exported": exported,
+            "symbol_role": symbol_role,
+            "dynamic_risk": dynamic_risk,
+            "confidence": Self::confidence_for_assessment(
+                symbol,
+                exported,
+                symbol_role,
+                dynamic_risk,
+                None,
+                None,
+            ),
+            "risk_factors": risk_factors,
         })
     }
 
-    fn build_project_overview(
-        storage: &Storage,
-        max_symbols: usize,
-        max_edges: usize,
-    ) -> Result<Value, String> {
-        let conn = storage.connection();
-        let total_symbols: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM symbols WHERE source = 'local'",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(|error| error.to_string())?;
-        let total_edges: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM (
-                    SELECT d.from_symbol, d.to_symbol
-                    FROM dependencies d
-                    JOIN symbols source_symbol ON source_symbol.id = d.from_symbol
-                    JOIN symbols target_symbol ON target_symbol.id = d.to_symbol
-                    WHERE source_symbol.source = 'local'
-                      AND target_symbol.source = 'local'
-                    GROUP BY d.from_symbol, d.to_symbol
-                )",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(|error| error.to_string())?;
+    fn interface_detail_value(storage: &Storage, symbol: &Symbol) -> Result<Value, String> {
+        let mut detail = Self::interface_summary_value(symbol);
+        let evidence = Self::symbol_evidence_value(storage, symbol)?;
 
-        let mut symbol_stmt = conn
-            .prepare(
-                "SELECT
-                    s.id,
-                    s.name,
-                    s.qualified_name,
-                    s.kind,
-                    s.file_path,
-                    s.line,
-                    s.column,
-                    s.visibility,
-                    s.source,
-                    COALESCE(incoming.count, 0) AS incoming_count,
-                    COALESCE(outgoing.count, 0) AS outgoing_count,
-                    COALESCE(incoming.count, 0) + COALESCE(outgoing.count, 0) AS degree
-                FROM symbols s
-                LEFT JOIN (
-                    SELECT to_symbol AS symbol_id, COUNT(*) AS count
-                    FROM dependencies
-                    GROUP BY to_symbol
-                ) incoming ON incoming.symbol_id = s.id
-                LEFT JOIN (
-                    SELECT from_symbol AS symbol_id, COUNT(*) AS count
-                    FROM dependencies
-                    GROUP BY from_symbol
-                ) outgoing ON outgoing.symbol_id = s.id
-                WHERE s.source = 'local'
-                ORDER BY degree DESC, s.qualified_name ASC
-                LIMIT ?1",
-            )
-            .map_err(|error| error.to_string())?;
-
-        let nodes = symbol_stmt
-            .query_map([max_symbols as i64], |row| {
-                let id: String = row.get(0)?;
-                Ok(json!({
-                    "id": id,
-                    "name": row.get::<_, String>(1)?,
-                    "qualified_name": row.get::<_, String>(2)?,
-                    "kind": row.get::<_, String>(3)?,
-                    "file_path": row.get::<_, String>(4)?,
-                    "line": row.get::<_, u32>(5)?,
-                    "column": row.get::<_, u32>(6)?,
-                    "visibility": row.get::<_, String>(7)?,
-                    "source": row.get::<_, String>(8)?,
-                    "incoming_count": row.get::<_, i64>(9)?,
-                    "outgoing_count": row.get::<_, i64>(10)?,
-                    "degree": row.get::<_, i64>(11)?,
-                }))
-            })
-            .map_err(|error| error.to_string())?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|error| error.to_string())?;
-
-        let selected_ids = nodes
-            .iter()
-            .filter_map(|node| node["id"].as_str().map(ToOwned::to_owned))
-            .collect::<HashSet<_>>();
-
-        let mut edges = Vec::new();
-        if !selected_ids.is_empty() && max_edges > 0 {
-            let mut edge_stmt = conn
-                .prepare(
-                    "SELECT
-                        d.from_symbol,
-                        d.to_symbol,
-                        COUNT(*) AS weight,
-                        GROUP_CONCAT(DISTINCT d.kind) AS kinds
-                    FROM dependencies d
-                    JOIN symbols source_symbol ON source_symbol.id = d.from_symbol
-                    JOIN symbols target_symbol ON target_symbol.id = d.to_symbol
-                    WHERE source_symbol.source = 'local'
-                      AND target_symbol.source = 'local'
-                    GROUP BY d.from_symbol, d.to_symbol
-                    ORDER BY weight DESC, d.from_symbol ASC, d.to_symbol ASC",
-                )
-                .map_err(|error| error.to_string())?;
-
-            let edge_rows = edge_stmt
-                .query_map([], |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, i64>(2)?,
-                        row.get::<_, Option<String>>(3)?,
-                    ))
-                })
-                .map_err(|error| error.to_string())?;
-
-            for edge in edge_rows {
-                let (source, target, weight, kinds) = edge.map_err(|error| error.to_string())?;
-                if !selected_ids.contains(&source) || !selected_ids.contains(&target) {
-                    continue;
-                }
-
-                edges.push(json!({
-                    "id": format!("{source}->{target}"),
-                    "source": source,
-                    "target": target,
-                    "weight": weight,
-                    "kinds": kinds
-                        .unwrap_or_default()
-                        .split(',')
-                        .filter(|kind| !kind.is_empty())
-                        .collect::<Vec<_>>(),
-                }));
-
-                if edges.len() >= max_edges {
-                    break;
-                }
-            }
+        if let Some(object) = detail.as_object_mut() {
+            object.insert("signature".to_string(), json!(symbol.signature));
+            object.insert("evidence".to_string(), evidence);
         }
 
-        let displayed_symbols = nodes.len();
-        let hidden_symbols = total_symbols.saturating_sub(displayed_symbols as i64);
+        Ok(detail)
+    }
+
+    fn symbol_evidence_value(storage: &Storage, symbol: &Symbol) -> Result<Value, String> {
+        let incoming_count = storage
+            .get_dependencies_to(&symbol.id)
+            .map_err(Self::storage_error_message)?
+            .len();
+        let outgoing_count = storage
+            .get_dependencies_from(&symbol.id)
+            .map_err(Self::storage_error_message)?
+            .len();
+        let exported = Self::symbol_is_exported(symbol);
+        let symbol_role = Self::classify_symbol_role(symbol, exported);
+        let (dynamic_risk, risk_factors) =
+            Self::estimate_dynamic_risk(symbol, exported, symbol_role);
+        let assessment = Self::assessment_for_symbol(symbol, incoming_count, dynamic_risk);
+        let status = if assessment == "statically_referenced" {
+            "observed"
+        } else {
+            "candidate"
+        };
+        let confidence = Self::confidence_for_assessment(
+            symbol,
+            exported,
+            symbol_role,
+            dynamic_risk,
+            Some(incoming_count),
+            Some(outgoing_count),
+        );
+        let verification_hints = Self::verification_hints(
+            symbol,
+            exported,
+            symbol_role,
+            dynamic_risk,
+            incoming_count,
+            outgoing_count,
+        );
 
         Ok(json!({
-            "total_symbols": total_symbols,
-            "total_edges": total_edges,
-            "displayed_symbols": displayed_symbols,
-            "displayed_edges": edges.len(),
-            "hidden_symbols": hidden_symbols,
-            "max_symbols": max_symbols,
-            "max_edges": max_edges,
-            "nodes": nodes,
-            "edges": edges,
+            "status": status,
+            "assessment": assessment,
+            "static_incoming_count": incoming_count,
+            "static_outgoing_count": outgoing_count,
+            "exported": exported,
+            "symbol_role": symbol_role,
+            "dynamic_risk": dynamic_risk,
+            "confidence": confidence,
+            "risk_factors": risk_factors,
+            "verification_hints": verification_hints,
+            "note": Self::assessment_note(assessment),
         }))
     }
 
+    fn symbol_is_exported(symbol: &Symbol) -> bool {
+        matches!(
+            symbol.visibility,
+            Visibility::Public | Visibility::Protected
+        )
+    }
+
+    fn classify_symbol_role(symbol: &Symbol, exported: bool) -> &'static str {
+        if !matches!(symbol.source, SymbolSource::Local) {
+            return "external_dependency";
+        }
+
+        if Self::is_test_symbol(symbol) {
+            return "test_only";
+        }
+
+        if matches!(
+            symbol.kind,
+            SymbolKind::Class
+                | SymbolKind::Struct
+                | SymbolKind::Enum
+                | SymbolKind::Interface
+                | SymbolKind::Trait
+                | SymbolKind::TypeAlias
+                | SymbolKind::Module
+        ) && exported
+        {
+            return "public_type_or_module";
+        }
+
+        if exported {
+            return "public_api";
+        }
+
+        "internal_implementation"
+    }
+
+    fn estimate_dynamic_risk(
+        symbol: &Symbol,
+        exported: bool,
+        symbol_role: &str,
+    ) -> (&'static str, Vec<String>) {
+        let fingerprint = format!(
+            "{} {} {}",
+            symbol.file_path, symbol.name, symbol.qualified_name
+        )
+        .to_ascii_lowercase();
+        let mut factors = Vec::new();
+
+        if !matches!(symbol.source, SymbolSource::Local) {
+            factors.push("symbol is external or builtin".to_string());
+            return ("low", factors);
+        }
+
+        if Self::is_test_symbol(symbol) {
+            factors.push("symbol lives under test-oriented paths".to_string());
+            return ("low", factors);
+        }
+
+        let has_high_term = HIGH_DYNAMIC_RISK_TERMS
+            .iter()
+            .any(|term| fingerprint.contains(term));
+        let has_medium_term = MEDIUM_DYNAMIC_RISK_TERMS
+            .iter()
+            .any(|term| fingerprint.contains(term));
+        let looks_like_handler = symbol.name.starts_with("handle_")
+            || symbol.name.starts_with("on_")
+            || symbol.name.starts_with("register_")
+            || symbol.name.starts_with("emit_")
+            || symbol.name.starts_with("listen_")
+            || symbol.name.starts_with("dispatch_");
+        let looks_like_store = symbol.name.starts_with("use") && symbol.name.ends_with("Store");
+
+        if has_high_term {
+            factors
+                .push("path or symbol name matches common registration/wiring terms".to_string());
+        }
+        if looks_like_handler {
+            factors.push("symbol name looks like a callback or registration target".to_string());
+        }
+        if looks_like_store {
+            factors.push("symbol name matches a framework store factory pattern".to_string());
+        }
+        if exported && symbol_role == "public_api" {
+            factors.push("symbol is publicly exported".to_string());
+        }
+        if has_medium_term {
+            factors.push("path or symbol name suggests framework/service indirection".to_string());
+        }
+
+        if has_high_term || looks_like_handler || looks_like_store {
+            ("high", factors)
+        } else if exported || has_medium_term || symbol_role == "public_type_or_module" {
+            ("medium", factors)
+        } else {
+            if factors.is_empty() {
+                factors.push("no common dynamic-entry patterns detected".to_string());
+            }
+            ("low", factors)
+        }
+    }
+
+    fn confidence_for_assessment(
+        symbol: &Symbol,
+        exported: bool,
+        symbol_role: &str,
+        dynamic_risk: &str,
+        incoming_count: Option<usize>,
+        outgoing_count: Option<usize>,
+    ) -> f64 {
+        let mut score: f64 = 0.58;
+
+        if let Some(incoming_count) = incoming_count {
+            if incoming_count == 0 {
+                score += 0.04;
+            } else {
+                score += 0.12;
+            }
+        }
+
+        if let Some(outgoing_count) = outgoing_count {
+            if outgoing_count > 0 {
+                score += 0.02;
+            }
+        }
+
+        if !matches!(symbol.source, SymbolSource::Local) {
+            score -= 0.14;
+        }
+
+        if !exported {
+            score += 0.06;
+        } else {
+            score -= 0.06;
+        }
+
+        match symbol_role {
+            "internal_implementation" => score += 0.08,
+            "test_only" => score += 0.12,
+            "public_api" => score -= 0.08,
+            "public_type_or_module" => score -= 0.04,
+            "external_dependency" => score -= 0.12,
+            _ => {}
+        }
+
+        match dynamic_risk {
+            "high" => score -= 0.24,
+            "medium" => score -= 0.12,
+            _ => {}
+        }
+
+        score.clamp(0.15, 0.92)
+    }
+
+    fn assessment_for_symbol(
+        symbol: &Symbol,
+        incoming_count: usize,
+        dynamic_risk: &str,
+    ) -> &'static str {
+        if !matches!(symbol.source, SymbolSource::Local) {
+            return "reference_only";
+        }
+
+        if incoming_count > 0 {
+            return "statically_referenced";
+        }
+
+        if matches!(dynamic_risk, "high" | "medium") {
+            return "dynamic_entry_candidate";
+        }
+
+        "unused_candidate"
+    }
+
+    fn assessment_note(assessment: &str) -> &'static str {
+        match assessment {
+            "statically_referenced" => {
+                "Static callers were found. Use this as structural evidence, then inspect impact before changing behavior."
+            }
+            "dynamic_entry_candidate" => {
+                "No static callers were found, but the symbol shape suggests dynamic or framework wiring. Verify with text search and registration checks before deletion."
+            }
+            "unused_candidate" => {
+                "No static callers were found. Treat this as a candidate for review, not as a final deletion verdict."
+            }
+            _ => {
+                "This result is structural evidence only. Check external usage and runtime wiring before making a decision."
+            }
+        }
+    }
+
+    fn verification_hints(
+        symbol: &Symbol,
+        exported: bool,
+        symbol_role: &str,
+        dynamic_risk: &str,
+        incoming_count: usize,
+        outgoing_count: usize,
+    ) -> Vec<String> {
+        let mut hints = Vec::new();
+
+        if incoming_count == 0 {
+            hints.push(
+                "No static callers were found. Treat this as a candidate and run text search before deleting anything."
+                    .to_string(),
+            );
+        } else {
+            hints.push(
+                "Static callers were found. Read those callers first to understand whether the symbol is part of a stable runtime path."
+                    .to_string(),
+            );
+        }
+
+        if matches!(dynamic_risk, "high" | "medium") {
+            hints.push(
+                "Inspect registration tables, route declarations, plugin hooks, event wiring, and string-based dispatch around this symbol."
+                    .to_string(),
+            );
+        }
+
+        if symbol.name.starts_with("use") && symbol.name.ends_with("Store") {
+            hints.push(
+                "Check framework conventions such as defineStore, store factories, or auto-registration before removal."
+                    .to_string(),
+            );
+        }
+
+        if exported {
+            hints.push(
+                "Because this symbol is exported, also inspect external entry points, public APIs, and integration tests."
+                    .to_string(),
+            );
+        }
+
+        if symbol_role == "test_only" {
+            hints.push(
+                "This looks test-oriented. Search tests, fixtures, and generated harnesses before cleanup."
+                    .to_string(),
+            );
+        }
+
+        if outgoing_count > 0 {
+            hints.push(
+                "Review the direct callees as part of impact analysis so you do not break behavior while cleaning or refactoring."
+                    .to_string(),
+            );
+        }
+
+        hints.push("Compile and run targeted tests after the change.".to_string());
+        hints
+    }
+
+    fn is_test_symbol(symbol: &Symbol) -> bool {
+        let fingerprint =
+            format!("{} {}", symbol.file_path, symbol.qualified_name).to_ascii_lowercase();
+        TEST_PATH_TERMS
+            .iter()
+            .any(|term| fingerprint.contains(term))
+            || symbol.name.starts_with("test_")
+            || symbol.name.ends_with("_test")
+    }
+
+    fn verification_search_terms(symbol: &Symbol) -> Vec<String> {
+        let mut terms = Vec::new();
+        Self::push_unique_string(&mut terms, symbol.name.clone());
+        Self::push_unique_string(&mut terms, symbol.qualified_name.clone());
+
+        if let Some(signature) = &symbol.signature {
+            if let Some(first_arg) = signature
+                .split(['(', ')', ',', ':'])
+                .map(str::trim)
+                .find(|segment| !segment.is_empty() && *segment != "fn" && *segment != "&self")
+            {
+                Self::push_unique_string(&mut terms, first_arg.to_string());
+            }
+        }
+
+        if symbol.name.starts_with("handle_") {
+            Self::push_unique_string(
+                &mut terms,
+                symbol.name.trim_start_matches("handle_").to_string(),
+            );
+        }
+
+        terms
+    }
+
+    fn context_dependency_summary_value(dependency: &ContextDependency) -> Value {
+        let mut summary = Self::interface_summary_value(&dependency.symbol);
+        if let Some(object) = summary.as_object_mut() {
+            object.insert("direction".to_string(), json!(dependency.direction));
+            object.insert("dependency_kind".to_string(), json!(dependency.dep_kind));
+        }
+        summary
+    }
+
+    fn verification_plan_value(
+        symbol: &Symbol,
+        evidence: &Value,
+        search_terms: &[String],
+        has_callers: bool,
+        has_callees: bool,
+    ) -> Vec<Value> {
+        let mut plan = vec![json!({
+            "step": "search_text_references",
+            "reason": "Catch string-based, config-driven, or framework-managed references that do not appear as static graph edges.",
+            "queries": search_terms,
+        })];
+
+        if evidence["dynamic_risk"] == "high" || evidence["dynamic_risk"] == "medium" {
+            plan.push(json!({
+                "step": "inspect_dynamic_wiring",
+                "reason": "This symbol looks like it may be wired through handlers, routes, stores, plugins, or events.",
+                "focus": symbol.file_path,
+            }));
+        }
+
+        if has_callers || has_callees {
+            plan.push(json!({
+                "step": "read_structural_neighbors",
+                "reason": "Review direct callers, direct callees, and same-file neighbors before editing or removal.",
+            }));
+        }
+
+        plan.push(json!({
+            "step": "compile_and_test",
+            "reason": "Use compile/test as the final safety check after any cleanup or refactor.",
+        }));
+        plan
+    }
     fn parse_task_context_mode(mode: Option<&str>) -> McpResult<TaskContextMode> {
         match mode.unwrap_or("auto").trim().to_ascii_lowercase().as_str() {
             "" | "auto" => Ok(TaskContextMode::Auto),
@@ -4942,9 +5760,28 @@ impl QuickDepServer {
         Parameters(request): Parameters<FileInterfacesRequest>,
     ) -> McpResult<Json<Value>> {
         if self.remote_client().is_some() {
-            return Ok(Json(self.proxy_tool("get_file_interfaces", &request).await?));
+            return Ok(Json(
+                self.proxy_tool("get_file_interfaces", &request).await?,
+            ));
         }
         Ok(Json(self.get_file_interfaces_value(request).await?))
+    }
+
+    /// Build a verification-oriented evidence package for one symbol.
+    #[tool(
+        description = "Build a verification-oriented evidence package for one symbol, including static callers/callees, dynamic-risk hints, related files, and next validation steps."
+    )]
+    pub async fn get_verification_context(
+        &self,
+        Parameters(request): Parameters<VerificationContextRequest>,
+    ) -> McpResult<Json<Value>> {
+        if self.remote_client().is_some() {
+            return Ok(Json(
+                self.proxy_tool("get_verification_context", &request)
+                    .await?,
+            ));
+        }
+        Ok(Json(self.get_verification_context_value(request).await?))
     }
 
     /// Build an agent-oriented task context package from anchors and workspace hints.
@@ -4971,7 +5808,8 @@ impl QuickDepServer {
     ) -> McpResult<Json<Value>> {
         if self.remote_client().is_some() {
             return Ok(Json(
-                self.proxy_tool("analyze_workflow_context", &request).await?,
+                self.proxy_tool("analyze_workflow_context", &request)
+                    .await?,
             ));
         }
         Ok(Json(
@@ -5009,7 +5847,8 @@ impl QuickDepServer {
     ) -> McpResult<Json<Value>> {
         if self.remote_client().is_some() {
             return Ok(Json(
-                self.proxy_tool("analyze_behavior_context", &request).await?,
+                self.proxy_tool("analyze_behavior_context", &request)
+                    .await?,
             ));
         }
         Ok(Json(
@@ -5299,6 +6138,34 @@ pub fn helper() {}
         .unwrap();
     }
 
+    fn write_verification_project(root: &Path) {
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        std::fs::write(
+            root.join("src/lib.rs"),
+            r#"
+pub fn entry() {
+    helper();
+}
+
+fn helper() {}
+
+fn orphan() {}
+"#,
+        )
+        .unwrap();
+    }
+
+    fn write_dynamic_candidate_project(root: &Path) {
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        std::fs::write(
+            root.join("src/lib.rs"),
+            r#"
+pub fn handle_device_connect() {}
+"#,
+        )
+        .unwrap();
+    }
+
     fn write_large_sample_project(root: &Path, file_count: usize) {
         std::fs::create_dir_all(root.join("src")).unwrap();
 
@@ -5558,6 +6425,9 @@ pub fn dispatchable_head() {}
         assert!(tools.iter().any(|tool| tool.name == "find_interfaces"));
         assert!(tools
             .iter()
+            .any(|tool| tool.name == "get_verification_context"));
+        assert!(tools
+            .iter()
             .any(|tool| tool.name == "analyze_workflow_context"));
         assert!(tools
             .iter()
@@ -5603,6 +6473,177 @@ pub fn dispatchable_head() {}
         let interfaces = structured["interfaces"].as_array().unwrap();
         assert_eq!(interfaces.len(), 1);
         assert_eq!(interfaces[0]["name"], "helper");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_interface_returns_candidate_evidence_for_static_orphan() -> anyhow::Result<()>
+    {
+        let project_dir = TempDir::new()?;
+        write_verification_project(project_dir.path());
+        let server = QuickDepServer::from_workspace(project_dir.path()).await?;
+
+        let value = server
+            .get_interface_value(InterfaceLookupRequest {
+                project: ProjectTarget::default(),
+                interface: "orphan".to_string(),
+            })
+            .await
+            .map_err(|error| anyhow!(error.message.clone()))?;
+
+        assert_eq!(value["interface"]["name"], "orphan");
+        assert_eq!(value["evidence"]["assessment"], "unused_candidate");
+        assert_eq!(value["evidence"]["status"], "candidate");
+        assert_eq!(value["evidence"]["static_incoming_count"], 0);
+        assert_eq!(value["evidence"]["dynamic_risk"], "low");
+        assert_eq!(value["evidence"]["symbol_role"], "internal_implementation");
+        assert!(value["evidence"]["verification_hints"]
+            .as_array()
+            .is_some_and(|hints| !hints.is_empty()));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_interface_marks_dynamic_entry_candidates() -> anyhow::Result<()> {
+        let project_dir = TempDir::new()?;
+        write_dynamic_candidate_project(project_dir.path());
+        let server = QuickDepServer::from_workspace(project_dir.path()).await?;
+
+        let value = server
+            .get_interface_value(InterfaceLookupRequest {
+                project: ProjectTarget::default(),
+                interface: "handle_device_connect".to_string(),
+            })
+            .await
+            .map_err(|error| anyhow!(error.message.clone()))?;
+
+        assert_eq!(value["evidence"]["assessment"], "dynamic_entry_candidate");
+        assert_eq!(value["evidence"]["dynamic_risk"], "high");
+        assert!(value["evidence"]["risk_factors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|factor| factor
+                .as_str()
+                .unwrap_or_default()
+                .contains("callback or registration target")));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_verification_context_packages_neighbors_and_plan() -> anyhow::Result<()> {
+        let project_dir = TempDir::new()?;
+        write_task_context_project(project_dir.path());
+        let server = QuickDepServer::from_workspace(project_dir.path()).await?;
+
+        let value = server
+            .get_verification_context_value(VerificationContextRequest {
+                project: ProjectTarget::default(),
+                interface: "helper".to_string(),
+            })
+            .await
+            .map_err(|error| anyhow!(error.message.clone()))?;
+
+        assert_eq!(value["interface"]["name"], "helper");
+        assert_eq!(value["evidence"]["static_incoming_count"], 2);
+        assert_eq!(value["evidence"]["assessment"], "statically_referenced");
+        assert!(value["direct_callers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["qualified_name"] == "src/callers.rs::run"));
+        assert!(value["direct_callees"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["qualified_name"] == "src/helpers.rs::store"));
+        assert!(value["verification_plan"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["step"] == "compile_and_test"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_mcp_tools_accept_project_as_string_path() -> anyhow::Result<()> {
+        let project_dir = TempDir::new()?;
+        write_sample_project(project_dir.path());
+        let client = start_test_server(project_dir.path()).await?;
+
+        let project_path = project_dir.path().display().to_string();
+
+        let scan_result = client
+            .call_tool(
+                CallToolRequestParams::new("scan_project").with_arguments(
+                    json!({
+                        "project": project_path
+                    })
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+                ),
+            )
+            .await?;
+        assert_eq!(scan_result.is_error, Some(false));
+
+        let find_result = client
+            .call_tool(
+                CallToolRequestParams::new("find_interfaces").with_arguments(
+                    json!({
+                        "project": project_dir.path().display().to_string(),
+                        "query": "helper"
+                    })
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+                ),
+            )
+            .await?;
+
+        let structured = find_result.structured_content.unwrap();
+        let interfaces = structured["interfaces"].as_array().unwrap();
+        assert_eq!(interfaces.len(), 1);
+        assert_eq!(interfaces[0]["name"], "helper");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_list_projects_skips_stale_manifest_entries() -> anyhow::Result<()> {
+        let workspace_dir = TempDir::new()?;
+        let stale_dir = TempDir::new()?;
+        let stale_id = ProjectId::from_path(stale_dir.path())?;
+        let stale_path = stale_dir.path().to_path_buf();
+        drop(stale_dir);
+
+        let manifest_path = get_manifest_path(workspace_dir.path());
+        let mut manifest = crate::project::Manifest::new();
+        manifest.add_project(crate::project::ProjectEntry::new(
+            stale_id.clone(),
+            "stale-project".to_string(),
+            &stale_path,
+        ));
+        manifest.save(&manifest_path)?;
+
+        let server = QuickDepServer::from_workspace(workspace_dir.path()).await?;
+        let value = server.list_projects_value().await?;
+
+        let projects = value["projects"].as_array().unwrap();
+        assert_eq!(projects.len(), 1);
+        assert!(projects
+            .iter()
+            .all(|project| project["id"] != stale_id.as_str()));
+        assert_eq!(
+            value["default_project_id"],
+            server.default_project_id.as_str()
+        );
+        let manifest = server.manager.get_manifest().await;
+        assert!(!manifest.contains_project(&stale_id));
 
         Ok(())
     }

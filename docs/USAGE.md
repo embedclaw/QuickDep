@@ -52,18 +52,18 @@ QuickDep 会把项目数据存到项目目录下的 `.quickdep/` 中，并支持
 
 ## 3. 安装方式
 
-截至 `2026-04-24`，当前已经实测有效的安装方式是源码安装：
+截至 `2026-04-27`，当前已经实测有效的安装方式包括源码安装；GitHub Release 也已经公开发布：
 
 ```bash
 cargo install --path .
 quickdep --version
 ```
 
-公开分发链路已经在仓库里准备好，但当前还没有真正发布：
+公开分发链路当前状态如下：
 
-- GitHub Releases：目标分发方式，当前仓库还没有公开 release 产物
-- Homebrew：目标命令是 `brew install embedclaw/tap/quickdep`，实际发布取决于 tap 工作流配置
-- npm 二进制包装器：目标命令是 `npm i -g @northcipher/quickdep`，当前包还未发布
+- GitHub Releases：已经公开发布，仓库地址是 `https://github.com/embedclaw/QuickDep/releases`
+- Homebrew：目标命令是 `brew install embedclaw/tap/quickdep`，当前公式还未公开可用
+- npm 二进制包装器：目标命令是 `npm i -g @embedclaw/quickdep`，当前包还未发布
 
 如果你想让 Claude Code / Codex / OpenCode 帮你自动完成安装和接入，直接复制：
 
@@ -162,7 +162,6 @@ quickdep [OPTIONS] [COMMAND]
 命令列表：
 
 - `serve`：启动 MCP 服务，默认命令
-- `daemon`：管理共享后台服务
 - `scan <path>`：扫描指定项目
 - `status <path>`：查看项目状态
 - `debug <path>`：调试查询
@@ -174,17 +173,11 @@ quickdep [OPTIONS] [COMMAND]
 - `--tools a,b,c`：只暴露指定工具
 - `--log-level <debug|info|warn|error>`：设置日志级别
 
-Daemon 子命令：
-
-- `daemon` 或 `daemon run`：以前台方式启动共享后台服务
-- `daemon status`：查看后台服务状态、已托管工作区数量、HTTP listener 数量
-- `daemon stop`：停止后台服务
-
 ---
 
 ## 6. MCP Tools
 
-QuickDep 当前提供以下 16 个工具：
+QuickDep 当前提供以下 17 个工具：
 
 - `list_projects`
 - `scan_project`
@@ -195,6 +188,7 @@ QuickDep 当前提供以下 16 个工具：
 - `get_dependencies`
 - `get_call_chain`
 - `get_file_interfaces`
+- `get_verification_context`
 - `get_task_context`
 - `analyze_workflow_context`
 - `analyze_change_impact`
@@ -207,15 +201,22 @@ QuickDep 当前提供以下 16 个工具：
 
 - `scan_project`：首次加载或重新扫描项目
 - `find_interfaces`：按名称搜索符号；更适合你已经知道部分符号名时做低层查找
-- `get_interface`：查看单个符号详情
-- `get_dependencies`：查看上游或下游依赖
+- `get_interface`：查看单个符号详情；返回 `evidence`，包含 `assessment / static_incoming_count / dynamic_risk / verification_hints`
+- `get_dependencies`：查看上游或下游依赖；同时返回当前符号的 `evidence`
 - `get_call_chain`：查两点之间调用链
+- `get_verification_context`：查看删除/清理/单符号判断时的验证证据包，包括直接调用者、直接被调方、相关文件、搜索词和下一步验证动作
 - `get_task_context`：默认的高层入口；适合自然语言工程问题，按场景自动路由到 `locate / behavior / impact / workflow / call_chain / watcher`
 - `analyze_workflow_context`：强制走 `workflow`，适合状态流转、审批、调度、排队类问题
 - `analyze_change_impact`：强制走 `impact`，适合重构、改动影响面、风险分析
 - `analyze_behavior_context`：强制走 `behavior`，适合“为什么会这样”、失败原因、运行时行为
 - `locate_relevant_code`：强制走 `locate`，适合先缩小到最该读的文件和符号
 - `rebuild_database`：数据库需要完整重建时使用
+
+低层符号查询现在默认返回“证据包”语义，而不是“判决”语义：
+
+- `assessment = unused_candidate` 只表示“当前静态图里没发现调用者”
+- `assessment = dynamic_entry_candidate` 表示“静态图里没发现调用者，但名字/路径看起来像动态注册入口，不能直接删”
+- `verification_hints` 会告诉你下一步该查全文、查注册点，还是优先看哪些相关文件
 
 ---
 

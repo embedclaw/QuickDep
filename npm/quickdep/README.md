@@ -1,9 +1,9 @@
-# @northcipher/quickdep
+# @embedclaw/quickdep
 
 Install QuickDep from npm:
 
 ```bash
-npm i -g @northcipher/quickdep
+npm i -g @embedclaw/quickdep
 ```
 
 The package downloads the matching GitHub Release binary during `postinstall` and exposes:

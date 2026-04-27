@@ -306,7 +306,10 @@ pub fn helper() {}
         write_sample_project(project_dir.path());
         let runtime = sample_runtime(project_dir.path()).await;
 
-        let scan = runtime.scan_project(project_dir.path(), false).await.unwrap();
+        let scan = runtime
+            .scan_project(project_dir.path(), false)
+            .await
+            .unwrap();
         assert_eq!(scan["stats"]["symbols"], 2);
         assert_eq!(scan["stats"]["dependencies"], 1);
 
