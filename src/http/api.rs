@@ -10,8 +10,8 @@ use serde_json::{json, Value};
 
 use crate::mcp::{
     BatchQueryRequest, CallChainRequest, DependenciesRequest, FileInterfacesRequest,
-    FindInterfacesRequest, InterfaceLookupRequest, ProjectStatusRequest, QuickDepServer,
-    ScanProjectRequest, TaskContextRequest,
+    FindInterfacesRequest, InterfaceLookupRequest, ProjectOverviewRequest, ProjectStatusRequest,
+    QuickDepServer, ScanProjectRequest, TaskContextRequest,
 };
 
 type HttpResult = Result<AxumJson<Value>, Response>;
@@ -43,6 +43,7 @@ pub fn router() -> axum::Router<QuickDepServer> {
         .route("/dependencies", post(get_dependencies))
         .route("/call-chain", post(get_call_chain))
         .route("/files/interfaces", post(get_file_interfaces))
+        .route("/projects/overview", post(get_project_overview))
         .route("/task-context", post(get_task_context))
         .route("/query/batch", post(batch_query))
 }
@@ -179,6 +180,20 @@ pub async fn get_file_interfaces(
         return Err(response);
     }
     match server.get_file_interfaces(Parameters(request)).await {
+        Ok(Json(value)) => Ok(AxumJson(value)),
+        Err(error) => Err(http_error(error)),
+    }
+}
+
+/// `POST /api/projects/overview`
+pub async fn get_project_overview(
+    State(server): State<QuickDepServer>,
+    AxumJson(request): AxumJson<ProjectOverviewRequest>,
+) -> HttpResult {
+    if let Some(response) = disabled_tool_response(&server, "get_project_overview") {
+        return Err(response);
+    }
+    match server.get_project_overview(Parameters(request)).await {
         Ok(Json(value)) => Ok(AxumJson(value)),
         Err(error) => Err(http_error(error)),
     }

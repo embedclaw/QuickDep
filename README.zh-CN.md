@@ -147,8 +147,38 @@ QuickDep 当前已经接入到本地图谱流水线的语言如下：
 1. 对跨文件 workflow、影响分析、调用链、无锚点排查、编辑器上下文问题，优先让 QuickDep 先做结构化收敛
 2. 行为细节仍然要配合少量原生读码确认
 3. 对“理解某一个局部函数 / 方法边界”这类问题，原生工具今天依然可能更直接；QuickDep 在这类场景里的主要价值是减少盲读源码，而不是已经全面胜出
+4. 对“这段代码能不能删”这类问题，要把 QuickDep 当成候选发现和验证入口，而不是最终裁决器
 
 这才是当前数据真正支撑的结论。本轮实验并不支持“QuickDep 已经让所有问题都更快、更好”这种更强说法。
+
+## 哪些问题不能只靠 QuickDep 下结论
+
+QuickDep 最擅长回答的是：
+
+- 我应该先看哪里
+- 谁在依赖这个符号
+- 这次修改最可能影响哪里
+- 哪几个文件在结构上最相关
+
+但下面这些问题，不能只靠 QuickDep 一步下结论：
+
+- 这段代码是不是一定没人用了
+- 这个符号是不是一定可以删除
+- 某条运行时路径是不是已经彻底废弃
+
+原因是：
+
+- QuickDep 当前最强的证据仍然是静态结构关系
+- 很多真实项目会用动态注册、框架约定、事件订阅、字符串分发这类方式
+- `incoming = 0` 的真实含义只是“当前静态图里没发现调用者”，不是“可以安全删除”
+
+所以在清理死代码或删除候选时，推荐工作流应该是：
+
+1. 先用 QuickDep 缩小候选范围
+2. 再用 `get_verification_context` 看 `assessment`、`dynamic_risk`、`verification_hints` 和相关文件
+3. 再用全文搜索补图谱之外的引用
+4. 再读少量关键文件确认设计意图
+5. 最后用编译和测试确认删除安全性
 
 ## QuickDep 和常见方案的区别
 
@@ -163,19 +193,20 @@ QuickDep 的定位不是替代所有代码工具，而是给本地 MCP Agent 补
 
 ## 安装与接入
 
-截至 `2026-04-24`，当前实测有效的安装路径是“源码安装 + `install-mcp` 接入客户端”。公开分发渠道已经准备好，但还没有真正发布上线。
+截至 `2026-04-27`，当前实际可用的安装情况如下：
 
 | 方式 | 当前状态 | 我们的验证结果 |
 | --- | --- | --- |
-| `cargo install --path .` | 已可用 | 已实测安装成功，`quickdep --version` 返回 `0.1.0` |
+| `cargo install --path .` | 已可用 | 适合本地源码安装；`quickdep --version` 会反映当前检出的分支版本 |
 | `quickdep install-mcp claude` | 已可用 | 已实测写入成功，`claude mcp list` 显示已连接 |
 | `quickdep install-mcp codex` | 已可用 | 已实测写入成功，`codex mcp list` 可见 |
 | `quickdep install-mcp opencode` | 已可用 | 已实测写入成功，`opencode mcp list` 显示已连接 |
-| GitHub Release | 未发布 | `releases/latest/download/...` 当前返回 `404` |
-| Homebrew | 未发布 | `Formula/quickdep.rb` 当前返回 `404` |
-| npm | 未发布 | `npm view @northcipher/quickdep` 当前返回 `E404` |
+| GitHub Release | 已发布 | `embedclaw/QuickDep` 已有公开 Release，当前最新公开版本是 `v0.1.3` |
+| Homebrew | 未发布 | tap / formula 还没有公开可用 |
+| npm | 未发布 | `npm view @embedclaw/quickdep` 当前返回 `E404` |
 
-今天想真正装起来，直接用：
+如果你今天只想用最省事的公开安装方式，优先使用 GitHub Release。  
+如果你正在本地开发或者希望安装当前检出的源码版本，直接用：
 
 ```bash
 cargo install --path .
@@ -255,6 +286,7 @@ HTTP 服务会提供：
 | 这个符号依赖了什么？ | `get_dependencies` 的 `outgoing` |
 | `entry` 和 `helper` 怎么连起来？ | `get_call_chain` |
 | 一个文件里有哪些接口？ | `get_file_interfaces` |
+| 这段代码到底是不是清理候选？ | `get_verification_context` |
 | 能不能直接图形化查看？ | [`web/`](web) 本地 Web UI |
 
 ## 当前已经交付的内容
@@ -262,7 +294,7 @@ HTTP 服务会提供：
 - Rust、TypeScript/JavaScript、Java、C#、Kotlin、PHP、Ruby、Swift、Objective-C、Python、Go、C、C++ 的 Tree-sitter 解析
 - 基于 SQLite 的图存储，开启 WAL，支持 FTS5 符号搜索
 - 增量扫描、文件监控、防抖、暂停/恢复
-- MCP 服务，提供项目、符号、依赖、调用链等工具
+- MCP 服务，提供项目、符号、依赖、调用链和验证证据包工具
 - HTTP API 和 WebSocket 状态流
 - 本地 Web UI，可查看项目状态、搜索、依赖图、表格和批量查询
 - Claude Code、Codex、OpenCode 的一键 `install-mcp`

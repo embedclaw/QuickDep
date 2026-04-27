@@ -118,6 +118,24 @@ impl Manifest {
         self.update_timestamp();
     }
 
+    /// Remove projects whose root paths no longer exist.
+    ///
+    /// Returns the IDs that were removed.
+    pub fn prune_missing_projects(&mut self) -> Vec<ProjectId> {
+        let mut removed = Vec::new();
+        self.projects.retain(|entry| {
+            let exists = Path::new(&entry.path).exists();
+            if !exists {
+                removed.push(entry.id.clone());
+            }
+            exists
+        });
+        if !removed.is_empty() {
+            self.update_timestamp();
+        }
+        removed
+    }
+
     /// Get a project by ID
     pub fn get_project(&self, id: &ProjectId) -> Option<&ProjectEntry> {
         self.projects.iter().find(|p| p.id == *id)
@@ -331,6 +349,34 @@ mod tests {
         manifest.add_project(entry);
         let retrieved = manifest.get_project(&id).unwrap();
         assert_eq!(retrieved.name, "test-project");
+    }
+
+    #[test]
+    fn test_manifest_prune_missing_projects() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let live_id = ProjectId::from_path(temp_dir.path()).expect("Failed to build id");
+
+        let stale_dir = TempDir::new().expect("Failed to create stale dir");
+        let stale_id = ProjectId::from_path(stale_dir.path()).expect("Failed to build stale id");
+        let stale_path = stale_dir.path().to_path_buf();
+        drop(stale_dir);
+
+        let mut manifest = Manifest::new();
+        manifest.add_project(ProjectEntry::new(
+            live_id.clone(),
+            "live-project".to_string(),
+            temp_dir.path(),
+        ));
+        manifest.add_project(ProjectEntry::new(
+            stale_id.clone(),
+            "stale-project".to_string(),
+            &stale_path,
+        ));
+
+        let removed = manifest.prune_missing_projects();
+        assert_eq!(removed, vec![stale_id.clone()]);
+        assert!(manifest.contains_project(&live_id));
+        assert!(!manifest.contains_project(&stale_id));
     }
 
     #[test]

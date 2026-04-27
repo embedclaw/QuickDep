@@ -13,7 +13,7 @@ const packageJson = JSON.parse(
   fs.readFileSync(path.join(packageRoot, "package.json"), "utf8")
 );
 
-const ownerRepo = process.env.QUICKDEP_REPOSITORY || "Northcipher/QuickDep";
+const ownerRepo = process.env.QUICKDEP_REPOSITORY || "embedclaw/QuickDep";
 const version = packageJson.version;
 const releaseBase =
   process.env.QUICKDEP_RELEASE_BASE_URL ||

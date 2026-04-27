@@ -24,19 +24,24 @@ quickdep serve
 
 ## 2. 安装 QuickDep
 
-截至 `2026-04-24`，当前实际验证结果如下：
+截至 `2026-04-27`，当前实际验证结果如下：
 
 | 路径 | 状态 | 验证方式 |
 | --- | --- | --- |
-| `cargo install --path .` | 已验证可用 | 实测安装成功，`quickdep --version` 返回 `0.1.0` |
+| `cargo install --path .` | 已验证可用 | 适合本地源码安装；`quickdep --version` 会反映当前检出的分支版本 |
 | `quickdep install-mcp claude` | 已验证可用 | `claude mcp list` 显示 QuickDep 已连接 |
 | `quickdep install-mcp codex` | 已验证可用 | `codex mcp list` 可见 QuickDep |
 | `quickdep install-mcp opencode` | 已验证可用 | `opencode mcp list` 显示 QuickDep 已连接 |
-| GitHub Releases | 尚未发布 | 最新下载地址当前返回 `404` |
-| Homebrew | 尚未发布 | `Formula/quickdep.rb` 当前返回 `404` |
-| npm 包装器 | 尚未发布 | `npm view @northcipher/quickdep` 当前返回 `E404` |
+| GitHub Releases | 已公开发布 | `embedclaw/QuickDep` 已有公开 Release，当前最新公开版本是 `v0.1.3` |
+| Homebrew | 尚未发布 | tap / formula 还没有公开可用 |
+| npm 包装器 | 尚未发布 | `npm view @embedclaw/quickdep` 当前返回 `E404` |
 
-所以今天如果要真正装起来，应该直接用源码安装：
+所以今天如果要真正装起来，公开安装方式优先级应该是：
+
+1. GitHub Release
+2. 源码安装
+
+如果你当前就在仓库内开发，或者希望安装当前检出的工作分支版本，直接用源码安装：
 
 ```bash
 cargo install --path .
@@ -183,7 +188,7 @@ Use the `quickdep` MCP server for symbol lookup, dependency tracing, and cross-f
 
 ### 6.1 GitHub Releases
 
-发布工作流已经配置好；在仓库打 `v*` tag 后，会构建以下产物并准备上传。当前仓库还没有公开 release，所以这些 URL 还不能直接下载。
+发布工作流已经配置好，并且仓库已经有公开 GitHub Release。后续在仓库打 `v*` tag 时，会继续构建并上传以下产物。
 
 Release 产物统一命名：
 
@@ -201,7 +206,7 @@ Release 产物统一命名：
 Homebrew 计划使用独立 tap，例如：
 
 ```bash
-brew install northcipher/tap/quickdep
+brew install embedclaw/tap/quickdep
 ```
 
 公式脚本已经准备好，但 tap / formula 当前还没有公开发布。发布后，公式会直接引用 GitHub Release 产物和 SHA256。
@@ -211,7 +216,7 @@ brew install northcipher/tap/quickdep
 npm 只作为二进制包装器，目标命令如下：
 
 ```bash
-npm i -g @northcipher/quickdep
+npm i -g @embedclaw/quickdep
 ```
 
 包装脚本已经在仓库中准备好，但 npm registry 当前还没有公开发布。发布后，安装脚本会根据平台下载对应的 GitHub Release 产物，并把 `quickdep` 放到包内 `bin` 目录下。

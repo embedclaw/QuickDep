@@ -9,7 +9,7 @@ const binaryPath = path.join(__dirname, "..", "vendor", executableName);
 
 if (!existsSync(binaryPath)) {
   console.error(
-    "QuickDep binary is missing. Reinstall @northcipher/quickdep or run `npm rebuild @northcipher/quickdep`."
+    "QuickDep binary is missing. Reinstall @embedclaw/quickdep or run `npm rebuild @embedclaw/quickdep`."
   );
   process.exit(1);
 }

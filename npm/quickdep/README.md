@@ -1,9 +1,9 @@
-# @northcipher/quickdep
+# @embedclaw/quickdep
 
 Install QuickDep from npm:
 
 ```bash
-npm i -g @northcipher/quickdep
+npm i -g @embedclaw/quickdep
 ```
 
 The package downloads the matching GitHub Release binary during `postinstall` and exposes:
@@ -14,4 +14,4 @@ quickdep
 
 See the main project for usage and MCP integration details:
 
-- https://github.com/Northcipher/QuickDep
+- https://github.com/embedclaw/QuickDep

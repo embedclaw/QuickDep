@@ -168,6 +168,58 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_rest_project_overview_endpoint() {
+        let (_temp_dir, server) = sample_server().await;
+        let router = build_router(server.clone());
+
+        let scan_response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/api/projects/scan")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from("{}"))
+                    .expect("Failed to build scan request"),
+            )
+            .await
+            .expect("Scan request failed");
+        assert_eq!(scan_response.status(), StatusCode::OK);
+
+        let overview_response = router
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/api/projects/overview")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(r#"{"max_symbols":12,"max_edges":24}"#))
+                    .expect("Failed to build overview request"),
+            )
+            .await
+            .expect("Overview request failed");
+        assert_eq!(overview_response.status(), StatusCode::OK);
+
+        let body = to_bytes(overview_response.into_body(), usize::MAX)
+            .await
+            .expect("Failed to read response body");
+        let payload: serde_json::Value =
+            serde_json::from_slice(&body).expect("Failed to parse overview response");
+
+        assert!(!payload["project"]["name"]
+            .as_str()
+            .unwrap_or_default()
+            .is_empty());
+        assert!(
+            payload["overview"]["displayed_symbols"]
+                .as_u64()
+                .unwrap_or(0)
+                >= 2
+        );
+        assert!(payload["overview"]["displayed_edges"].as_u64().unwrap_or(0) >= 1);
+        assert_eq!(payload["overview"]["nodes"][0]["source"], "Local");
+    }
+
+    #[tokio::test]
     async fn test_rest_task_context_endpoint() {
         let (_temp_dir, server) = sample_server().await;
         let router = build_router(server.clone());

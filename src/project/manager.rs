@@ -104,7 +104,7 @@ impl ProjectManager {
         let manifest_path = manifest_path.as_ref().to_path_buf();
 
         // Load existing manifest or create new
-        let manifest = Manifest::load(&manifest_path).unwrap_or_else(|e| {
+        let mut manifest = Manifest::load(&manifest_path).unwrap_or_else(|e| {
             warn!(
                 "Failed to load manifest at {}: {}",
                 manifest_path.display(),
@@ -112,6 +112,21 @@ impl ProjectManager {
             );
             Manifest::new()
         });
+        let removed = manifest.prune_missing_projects();
+        if !removed.is_empty() {
+            warn!(
+                removed_count = removed.len(),
+                manifest_path = %manifest_path.display(),
+                "Pruned stale project entries from manifest"
+            );
+            if let Err(error) = manifest.save(&manifest_path) {
+                warn!(
+                    manifest_path = %manifest_path.display(),
+                    error = %error,
+                    "Failed to persist pruned manifest"
+                );
+            }
+        }
         let projects = Self::projects_from_manifest(&manifest);
 
         Self {
@@ -182,7 +197,14 @@ impl ProjectManager {
 
         // Start background scan handler
         let projects = manager.projects.clone();
-        tokio::spawn(Self::scan_handler(scan_rx, projects));
+        let manifest = manager.manifest.clone();
+        let manifest_path = manager.manifest_path.clone();
+        tokio::spawn(Self::scan_handler(
+            scan_rx,
+            projects,
+            manifest,
+            manifest_path,
+        ));
 
         manager
     }
@@ -191,6 +213,8 @@ impl ProjectManager {
     async fn scan_handler(
         mut scan_rx: mpsc::Receiver<ScanMessage>,
         projects: Arc<RwLock<HashMap<ProjectId, Project>>>,
+        manifest: Arc<RwLock<Manifest>>,
+        manifest_path: PathBuf,
     ) {
         debug!("Scan handler started");
 
@@ -323,6 +347,8 @@ impl ProjectManager {
                         },
                     };
 
+                    Self::apply_scan_result(&projects, &manifest, &manifest_path, &result).await;
+
                     if result_tx.send(result).await.is_err() {
                         warn!("Failed to send scan result");
                     }
@@ -339,6 +365,53 @@ impl ProjectManager {
                     break;
                 }
             }
+        }
+    }
+
+    async fn apply_scan_result(
+        projects: &Arc<RwLock<HashMap<ProjectId, Project>>>,
+        manifest: &Arc<RwLock<Manifest>>,
+        manifest_path: &Path,
+        result: &ScanResult,
+    ) {
+        {
+            let mut projects = projects.write().await;
+            if let Some(project) = projects.get_mut(&result.project_id) {
+                if let Some(error) = &result.error {
+                    project.fail_loading(error.clone());
+                } else {
+                    project.complete_loading(
+                        result.file_count,
+                        result.symbol_count,
+                        result.dependency_count,
+                    );
+                }
+            }
+        }
+
+        if result.error.is_some() {
+            return;
+        }
+
+        let mut manifest = manifest.write().await;
+        if let Some(entry) = manifest
+            .projects
+            .iter_mut()
+            .find(|entry| entry.id == result.project_id)
+        {
+            entry.update_scanned(
+                result.file_count,
+                result.symbol_count,
+                result.dependency_count,
+            );
+        }
+
+        if let Err(error) = manifest.save(manifest_path) {
+            error!(
+                project_id = %result.project_id,
+                error = %error,
+                "failed to persist manifest after scan completion"
+            );
         }
     }
 
@@ -566,33 +639,8 @@ impl ProjectManager {
 
             // Wait for scan result
             if let Some(result) = result_rx.recv().await {
-                let mut projects = self.projects.write().await;
-                if let Some(project) = projects.get_mut(&result.project_id) {
-                    if let Some(ref error) = result.error {
-                        project.fail_loading(error.clone());
-                    } else {
-                        project.complete_loading(
-                            result.file_count,
-                            result.symbol_count,
-                            result.dependency_count,
-                        );
-                    }
-                }
-
-                if result.error.is_none() {
-                    let mut manifest = self.manifest.write().await;
-                    if let Some(entry) = manifest
-                        .projects
-                        .iter_mut()
-                        .find(|entry| entry.id == result.project_id)
-                    {
-                        entry.update_scanned(
-                            result.file_count,
-                            result.symbol_count,
-                            result.dependency_count,
-                        );
-                    }
-                    manifest.save(&self.manifest_path)?;
+                if let Some(error) = result.error {
+                    return Err(ManagerError::ScanFailed(error));
                 }
             }
         } else {
@@ -619,6 +667,31 @@ impl ProjectManager {
             .iter()
             .map(|(id, p)| (id.clone(), p.state.clone()))
             .collect()
+    }
+
+    /// Remove manifest and in-memory entries whose project paths no longer exist.
+    pub async fn prune_missing_projects(&self) -> Result<Vec<ProjectId>, ManagerError> {
+        let removed = {
+            let mut manifest = self.manifest.write().await;
+            let removed = manifest.prune_missing_projects();
+            if !removed.is_empty() {
+                manifest.save(&self.manifest_path)?;
+            }
+            removed
+        };
+
+        if removed.is_empty() {
+            return Ok(removed);
+        }
+
+        {
+            let mut projects = self.projects.write().await;
+            for id in &removed {
+                projects.remove(id);
+            }
+        }
+
+        Ok(removed)
     }
 
     /// Check if a project exists
@@ -1227,6 +1300,118 @@ mod tests {
             .expect("manifest config missing")
             .parser_map
             .is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_scan_handler_updates_state_even_when_result_receiver_is_dropped() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let manifest_path = temp_dir.path().join("manifest.json");
+        let manager = ProjectManager::with_scanner(&manifest_path).await;
+
+        let project_dir = TempDir::new().expect("Failed to create project dir");
+        std::fs::create_dir_all(project_dir.path().join("src")).expect("Failed to create src dir");
+        std::fs::write(
+            project_dir.path().join("src/lib.rs"),
+            "pub fn entry() { helper(); }\npub fn helper() {}\n",
+        )
+        .expect("Failed to write lib.rs");
+
+        let id = manager
+            .register(
+                project_dir.path(),
+                "dropped-result-project",
+                Some(ProjectConfig::default().with_languages(vec!["rust".to_string()])),
+            )
+            .await
+            .expect("Failed to register");
+
+        {
+            let mut projects = manager.projects.write().await;
+            projects
+                .get_mut(&id)
+                .expect("Project not found")
+                .start_loading();
+        }
+
+        let scan_tx = manager.scan_tx.clone().expect("scan sender missing");
+        let (result_tx, result_rx) = mpsc::channel::<ScanResult>(1);
+        drop(result_rx);
+
+        scan_tx
+            .send(ScanMessage::Start {
+                project_id: id.clone(),
+                rebuild: false,
+                result_tx,
+            })
+            .await
+            .expect("Failed to send scan request");
+
+        let mut loaded = false;
+        for _ in 0..40 {
+            tokio::time::sleep(Duration::from_millis(25)).await;
+            let project = manager
+                .get(&id)
+                .await
+                .expect("Failed to get project")
+                .expect("Project missing");
+            if project.is_loaded() {
+                loaded = true;
+                break;
+            }
+        }
+
+        assert!(
+            loaded,
+            "project should leave loading state even if receiver drops"
+        );
+
+        let manifest = manager.get_manifest().await;
+        let entry = manifest.get_project(&id).expect("manifest entry missing");
+        assert_eq!(entry.file_count, 1);
+        assert_eq!(entry.symbol_count, 2);
+        assert_eq!(entry.dependency_count, 1);
+    }
+
+    #[tokio::test]
+    async fn test_prune_missing_projects_removes_manifest_and_runtime_entries() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let manifest_path = temp_dir.path().join("manifest.json");
+        let manager = ProjectManager::with_scanner(&manifest_path).await;
+
+        let live_dir = TempDir::new().expect("Failed to create live dir");
+        let live_id = manager
+            .register(live_dir.path(), "live-project", None)
+            .await
+            .expect("Failed to register live project");
+
+        let stale_dir = TempDir::new().expect("Failed to create stale dir");
+        let stale_id = ProjectId::from_path(stale_dir.path()).expect("Failed to build stale id");
+        let stale_path = stale_dir.path().to_path_buf();
+        drop(stale_dir);
+
+        {
+            let mut manifest = manager.manifest.write().await;
+            manifest.add_project(crate::project::ProjectEntry::new(
+                stale_id.clone(),
+                "stale-project".to_string(),
+                &stale_path,
+            ));
+            manifest
+                .save(&manager.manifest_path)
+                .expect("Failed to save manifest");
+        }
+
+        let removed = manager
+            .prune_missing_projects()
+            .await
+            .expect("Failed to prune missing projects");
+        assert_eq!(removed, vec![stale_id.clone()]);
+        assert!(manager.exists(&live_id).await);
+        assert!(!manager.exists(&stale_id).await);
+
+        let manifest = manager.get_manifest().await;
+        assert!(manifest.contains_project(&live_id));
+        assert!(!manifest.contains_project(&stale_id));
     }
 
     #[tokio::test]

@@ -19,3 +19,16 @@ All notable changes to this project will be documented in this file.
 
 - Updated `README.md` with the current CLI, configuration, HTTP transport, and usage examples.
 - Added `docs/API.md` to document MCP, HTTP, WebSocket, resource, and error contracts.
+
+## [0.1.3] - 2026-04-27
+
+### Added
+
+- Added verification-oriented MCP evidence packages, including `assessment`, `dynamic_risk`, `verification_hints`, `confidence`, and the new `get_verification_context` tool.
+- Added manifest self-healing for stale project entries and broader project-target input compatibility for MCP tools.
+- Added HTTP project overview endpoint coverage and release/distribution metadata aligned to the `embedclaw/QuickDep` repository.
+
+### Changed
+
+- Reframed low-level symbol/dependency responses from verdict-like output into evidence packages for agent verification workflows.
+- Updated installation, integration, and plain-language docs to reflect the verification workflow and current package/release identity.
